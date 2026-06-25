@@ -98,17 +98,20 @@ ${POPUP_BLOCK_SCRIPT}
 <\/script></body></html>`;
 }
 
-function isDlhdWrapperHtml(html: string): boolean {
+function isDlhdIframeWrapper(html: string): boolean {
   return /<iframe[^>]+src=["']https?:\/\//i.test(html);
 }
 
-/** dlhd.pk wrapper first; fall back to proxied direct player HTML when the site is down. */
+/**
+ * Path-specific DLHD wrapper when the mirror serves an iframe embed.
+ * When dlhd.pk is down, use buildHlsFramePlayer so m3u8 is fetched fresh
+ * (daddy3 Clappr pages embed signed URLs that expire immediately).
+ */
 async function fetchStreamPageHtml(path: string, id: string): Promise<string | null> {
   const wrapperHtml = await fetchHtml(getDlhdWrapperUrl(path, id));
-  if (wrapperHtml && isDlhdWrapperHtml(wrapperHtml)) return wrapperHtml;
-
-  const playerHtml = await fetchHtml(getDirectPlayerUrl(id));
-  if (playerHtml) return playerHtml;
+  if (wrapperHtml && isDlhdIframeWrapper(wrapperHtml)) {
+    return wrapperHtml;
+  }
 
   return buildHlsFramePlayer(id);
 }
