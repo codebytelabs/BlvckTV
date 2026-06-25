@@ -1,19 +1,55 @@
 import type { StreamingSource } from '@/types';
 
+/** Default VOD source order (first = preferred). */
+export const DEFAULT_SOURCE_PRIORITY: StreamingSource[] = [
+  'vidsrcme',
+  'vidking',
+  'vidsrcto',
+  'vidsync',
+  'rivestream',
+  'rivestreamAgg',
+  'rivestreamTorrent',
+];
+
+/** vidsrc.to blocks/framed embeds often fail; vidsrc.pm is the active mirror (same API). */
+const VIDSRC_EMBED_BASE = 'https://vidsrc.pm';
+
 export const SOURCES: { id: StreamingSource; name: string; description: string }[] = [
-  { id: 'vidsrcto', name: 'VidSrc.to', description: 'Fast, reliable streams with subtitles' },
-  { id: 'vidsync', name: 'Vidsync', description: 'TMDB embeds with auto-next and server picker' },
+  { id: 'vidsrcme', name: 'VidSrcMe', description: 'Mirror with custom subs support' },
   { id: 'vidking', name: 'Vidking', description: 'Multiple servers including 4K' },
+  { id: 'vidsrcto', name: 'VidSrc.to', description: 'Fast streams with subtitles (vidsrc.pm mirror)' },
+  { id: 'vidsync', name: 'Vidsync', description: 'TMDB embeds with auto-next and server picker' },
   { id: 'rivestream', name: 'RiveStream', description: 'Standard embed with good quality' },
   { id: 'rivestreamAgg', name: 'RiveStream Agg', description: 'Multi-source aggregator' },
   { id: 'rivestreamTorrent', name: 'RiveStream BT', description: 'Torrent-based streaming' },
-  { id: 'vidsrcme', name: 'VidSrcMe', description: 'Mirror with custom subs support' },
 ];
 
-export function getMovieEmbedUrl(source: StreamingSource, tmdbId: number | string): string {
+type EmbedIds = {
+  tmdbId: number | string;
+  imdbId?: string | null;
+};
+
+function normalizeImdbId(imdbId?: string | null): string | null {
+  if (!imdbId) return null;
+  const trimmed = imdbId.trim();
+  if (!trimmed) return null;
+  return trimmed.startsWith('tt') ? trimmed : `tt${trimmed}`;
+}
+
+/** VidSrc accepts TMDB numeric id or IMDb tt id — prefer IMDb when available. */
+function vidsrcMediaId(ids: EmbedIds): string {
+  return normalizeImdbId(ids.imdbId) ?? String(ids.tmdbId);
+}
+
+export function getMovieEmbedUrl(
+  source: StreamingSource,
+  tmdbId: number | string,
+  imdbId?: string | null,
+): string {
+  const ids: EmbedIds = { tmdbId, imdbId };
   switch (source) {
     case 'vidsrcto':
-      return `https://vidsrc.to/embed/movie/${tmdbId}`;
+      return `${VIDSRC_EMBED_BASE}/embed/movie/${vidsrcMediaId(ids)}`;
     case 'vidking':
       return `https://www.vidking.net/embed/movie/${tmdbId}`;
     case 'vidsync':
@@ -27,7 +63,7 @@ export function getMovieEmbedUrl(source: StreamingSource, tmdbId: number | strin
     case 'vidsrcme':
       return `https://vidsrc-embed.ru/embed/movie?tmdb=${tmdbId}`;
     default:
-      return `https://vidsrc.to/embed/movie/${tmdbId}`;
+      return `${VIDSRC_EMBED_BASE}/embed/movie/${vidsrcMediaId(ids)}`;
   }
 }
 
@@ -35,13 +71,18 @@ export function getTVEmbedUrl(
   source: StreamingSource,
   tmdbId: number | string,
   season?: number,
-  episode?: number
+  episode?: number,
+  imdbId?: string | null,
 ): string {
+  const ids: EmbedIds = { tmdbId, imdbId };
+  const mediaId = vidsrcMediaId(ids);
   switch (source) {
     case 'vidsrcto': {
-      if (season && episode) return `https://vidsrc.to/embed/tv/${tmdbId}/${season}/${episode}`;
-      if (season) return `https://vidsrc.to/embed/tv/${tmdbId}/${season}`;
-      return `https://vidsrc.to/embed/tv/${tmdbId}`;
+      if (season != null && episode != null) {
+        return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}/${episode}`;
+      }
+      if (season != null) return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}`;
+      return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}`;
     }
     case 'vidking': {
       if (season && episode) return `https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}`;
@@ -68,23 +109,32 @@ export function getTVEmbedUrl(
       return `https://vidsrc-embed.ru/embed/tv?tmdb=${tmdbId}`;
     }
     default: {
-      if (season && episode) return `https://vidsrc.to/embed/tv/${tmdbId}/${season}/${episode}`;
-      return `https://vidsrc.to/embed/tv/${tmdbId}`;
+      if (season != null && episode != null) {
+        return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}/${episode}`;
+      }
+      return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}`;
     }
   }
 }
 
 const DLHD_BASE = 'https://dlhd.pk';
 
-/** DLHD mirror paths — player/watch/plus most reliable. */
-export const LIVE_CHANNEL_PATHS = ['player', 'watch', 'plus', 'casting', 'cast', 'stream'];
+/** DLHD mirror paths — watch/player most reliable. */
+export const LIVE_CHANNEL_PATHS = ['watch', 'player', 'plus', 'casting', 'cast', 'stream'] as const;
 
-export const DEFAULT_LIVE_PATH = 'player';
+export type LiveChannelPath = (typeof LIVE_CHANNEL_PATHS)[number];
+
+export const DEFAULT_LIVE_PATH: LiveChannelPath = 'watch';
+
+/** Keep iframe servers in watch → player → rest order regardless of cache/probe order. */
+export function sortLivePaths(paths: readonly string[]): LiveChannelPath[] {
+  return LIVE_CHANNEL_PATHS.filter(p => paths.includes(p));
+}
 
 /** Human-readable labels for DLHD mirror paths. */
 export const LIVE_PATH_LABELS: Record<string, string> = {
-  player: 'Player (recommended)',
-  watch: 'Watch',
+  watch: 'Watch (recommended)',
+  player: 'Player',
   plus: 'Plus',
   casting: 'Casting',
   cast: 'Cast',

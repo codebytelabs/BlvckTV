@@ -1,7 +1,13 @@
-import { getLiveStreamUrl, LIVE_CHANNEL_PATHS, DEFAULT_LIVE_PATH } from '@/lib/streamingSources';
+import {
+  getLiveStreamUrl,
+  LIVE_CHANNEL_PATHS,
+  DEFAULT_LIVE_PATH,
+  sortLivePaths,
+} from '@/lib/streamingSources';
+import { isPlayableStreamHtml } from '@/lib/dlhdPlayerUrls';
 
-const SESSION_KEY = 'blvcktv-path-discovery-v1';
-const STORAGE_KEY = 'blvcktv-channel-paths-v1';
+const SESSION_KEY = 'blvcktv-path-discovery-v2';
+const STORAGE_KEY = 'blvcktv-channel-paths-v2';
 
 type PathCache = Record<string, { paths: string[]; updatedAt: number }>;
 
@@ -42,9 +48,7 @@ function writeSessionDiscovery(cache: PathCache): void {
 }
 
 function isValidStreamHtml(html: string): boolean {
-  if (html.length < 200) return false;
-  if (/404 not found|page could not be found/i.test(html) && !/<iframe/i.test(html)) return false;
-  return /<iframe[^>]+src=["']https?:\/\//i.test(html);
+  return isPlayableStreamHtml(html);
 }
 
 async function fetchPathHtml(path: string, channelId: string): Promise<string | null> {
@@ -68,7 +72,7 @@ async function fetchPathHtml(path: string, channelId: string): Promise<string | 
 export async function discoverPathsForChannel(channelId: string): Promise<string[]> {
   const id = normalizeId(channelId);
   const session = readSessionDiscovery();
-  if (session[id]?.paths.length) return session[id].paths;
+  if (session[id]?.paths.length) return sortLivePaths(session[id].paths);
 
   const working: string[] = [];
 
@@ -79,8 +83,8 @@ export async function discoverPathsForChannel(channelId: string): Promise<string
     }),
   );
 
-  const ordered = LIVE_CHANNEL_PATHS.filter(p => working.includes(p));
-  const result = ordered.length > 0 ? ordered : ['player', 'watch', 'plus'];
+  const ordered = sortLivePaths(working);
+  const result = ordered.length > 0 ? ordered : sortLivePaths(['watch', 'player', 'plus']);
 
   writeSessionDiscovery({ ...session, [id]: { paths: result, updatedAt: Date.now() } });
   return result;
@@ -89,22 +93,19 @@ export async function discoverPathsForChannel(channelId: string): Promise<string
 export function getCachedPathsForChannel(channelId: string): string[] {
   const id = normalizeId(channelId);
   const session = readSessionDiscovery()[id]?.paths;
-  if (session?.length) return session;
+  if (session?.length) return sortLivePaths(session);
 
   const stored = readStorage()[id]?.paths;
-  if (stored?.length) return stored;
+  if (stored?.length) return sortLivePaths(stored);
 
-  return ['player', 'watch', 'plus'];
+  return sortLivePaths(['watch', 'player', 'plus']);
 }
 
 export function markPathWorking(channelId: string, path: string): void {
   const id = normalizeId(channelId);
   const cache = readStorage();
   const existing = cache[id]?.paths ?? [];
-  const merged = [...new Set([path, ...existing])].filter(p =>
-    LIVE_CHANNEL_PATHS.includes(p),
-  );
-  merged.sort((a, b) => LIVE_CHANNEL_PATHS.indexOf(a) - LIVE_CHANNEL_PATHS.indexOf(b));
+  const merged = sortLivePaths([...new Set([path, ...existing])]);
   cache[id] = { paths: merged, updatedAt: Date.now() };
   writeStorage(cache);
 
@@ -114,8 +115,8 @@ export function markPathWorking(channelId: string, path: string): void {
 }
 
 /**
- * Always use the DLHD wrapper page — never the direct third-party player URL.
- * Direct URLs cause "sandbox not allowed" and "access denied" errors.
+ * DLHD wrapper page URL for a mirror path (watch, player, plus, …).
+ * Each server menu option maps to a different path — not the same embed for all.
  */
 export function buildLivePlayerUrl(
   channelId: string,
@@ -123,6 +124,17 @@ export function buildLivePlayerUrl(
   streamUrl?: string,
 ): string {
   return getLiveStreamUrl(channelId, path, streamUrl);
+}
+
+/**
+ * @deprecated Use resolveLiveIframeSrc — never iframe dlhd.pk on web.
+ */
+export function buildLiveIframeSrc(
+  channelId: string,
+  path: string,
+  streamUrl?: string,
+): string {
+  return withAutoplay(buildLivePlayerUrl(channelId, path, streamUrl));
 }
 
 export function getPreferredPath(channelId: string): string {

@@ -10,7 +10,7 @@ export default function DetailModal() {
   const { fetchMovieDetails, fetchTVDetails, fetchTVSeason } = useTMDB();
   const [item, setItem] = useState<Movie | TVShow | null>(null);
   const [loading, setLoading] = useState(false);
-  const [currentSource, setCurrentSource] = useState<StreamingSource>((settings.sourcePriority?.[0] || 'vidsrcto') as StreamingSource);
+  const [currentSource, setCurrentSource] = useState<StreamingSource>((settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource);
   const [, setShowSourceMenu] = useState(false);
   void setShowSourceMenu; // suppress unused warning, used in JSX
   const [selectedSeason, setSelectedSeason] = useState(1);
@@ -64,6 +64,7 @@ export default function DetailModal() {
       title,
       season,
       episode,
+      imdbId: item.imdb_id,
     });
     setSelectedDetail(null);
   };
@@ -71,8 +72,14 @@ export default function DetailModal() {
   const handleQuickPlay = () => {
     if (!item) return;
     const sourceUrl = selectedDetail?.type === 'movie'
-      ? getMovieEmbedUrl(currentSource, item.id)
-      : getTVEmbedUrl(currentSource, item.id, episodes[0]?.season_number, episodes[0]?.episode_number);
+      ? getMovieEmbedUrl(currentSource, item.id, item.imdb_id)
+      : getTVEmbedUrl(
+          currentSource,
+          item.id,
+          episodes[0]?.season_number,
+          episodes[0]?.episode_number,
+          item.imdb_id,
+        );
     window.open(sourceUrl, '_blank');
   };
 

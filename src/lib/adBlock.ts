@@ -46,8 +46,13 @@ const ALLOWED_STREAM_HOSTS = [
   'dlhd.pk',
   'wikisport.info',
   'romponalis.st',
+  'hamis.romponalis.st',
+  'embed.sportshub.to',
+  'sportshub.to',
   'embed.st',
   'vidsrc.to',
+  'vidsrc.pm',
+  'vidsrc.wiki',
   'vidsrc-embed.ru',
   'vidking.net',
   'vidsync.live',
@@ -99,9 +104,18 @@ export function isBlockedUrl(url: string): boolean {
 }
 
 /** Pick the best player iframe from a DLHD wrapper page (skip ad iframes). */
+export function isDlhdHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    return host === 'dlhd.pk' || host.endsWith('.dlhd.pk');
+  } catch {
+    return false;
+  }
+}
+
 export function pickBestPlayerIframe(candidates: string[]): string | null {
   const scored = candidates
-    .filter(url => !isBlockedUrl(url))
+    .filter(url => !isBlockedUrl(url) && !isDlhdHost(url))
     .map(url => {
       const lower = url.toLowerCase();
       let score = 0;
@@ -114,10 +128,11 @@ export function pickBestPlayerIframe(candidates: string[]): string | null {
     .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score);
 
-  return scored[0]?.url ?? candidates.find(u => !isBlockedUrl(u)) ?? null;
+  return scored[0]?.url ?? candidates.find(u => !isBlockedUrl(u) && !isDlhdHost(u)) ?? null;
 }
 
-export const IFRAME_SANDBOX =
+/** Blocks in-iframe popups/tabs; unused — live embeds reject sandbox. Kept for reference. */
+export const LIVE_IFRAME_SANDBOX =
   'allow-scripts allow-same-origin allow-presentation allow-fullscreen allow-forms';
 
 export const IFRAME_ALLOW =

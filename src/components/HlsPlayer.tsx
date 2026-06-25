@@ -88,7 +88,13 @@ export default function HlsPlayer({ src, title, onError, onReady }: HlsPlayerPro
 
         const Hls = window.Hls;
         if (Hls?.isSupported()) {
-          const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+          const hls = new Hls({
+            enableWorker: true,
+            lowLatencyMode: true,
+            xhrSetup: (xhr) => {
+              xhr.withCredentials = false;
+            },
+          });
           hlsRef.current = hls;
           hls.loadSource(src);
           hls.attachMedia(video);

@@ -1,4 +1,5 @@
 import type { WatchItem, HistoryItem, ContinueWatchingItem } from '@/types';
+import { DEFAULT_SOURCE_PRIORITY } from '@/lib/streamingSources';
 
 const KEYS = {
   WATCHLIST: 'blvcktv_watchlist',
@@ -115,17 +116,64 @@ export interface AppSettings {
   sourcePriority: string[];
 }
 
+const DEFAULT_SETTINGS: AppSettings = {
+  autoPlay: true,
+  defaultQuality: 'auto',
+  defaultSubtitleLang: 'en',
+  enableOpenSubtitles: false,
+  sourcePriority: [...DEFAULT_SOURCE_PRIORITY],
+};
+
+/** Prior factory defaults — migrate stored settings that still use them. */
+const LEGACY_DEFAULT_PRIORITIES = [
+  [
+    'vidsrcto',
+    'vidsync',
+    'vidking',
+    'rivestream',
+    'rivestreamAgg',
+    'vidsrcme',
+    'rivestreamTorrent',
+  ],
+  [
+    'vidsrcme',
+    'vidking',
+    'vidsync',
+    'vidsrcto',
+    'rivestream',
+    'rivestreamAgg',
+    'rivestreamTorrent',
+  ],
+  [
+    'vidsrcto',
+    'vidsrcme',
+    'vidking',
+    'vidsync',
+    'rivestream',
+    'rivestreamAgg',
+    'rivestreamTorrent',
+  ],
+];
+
+function shouldMigrateSourcePriority(priority: string[] | undefined): boolean {
+  if (!priority?.length) return true;
+  const joined = priority.join(',');
+  return LEGACY_DEFAULT_PRIORITIES.some(legacy => joined === legacy.join(','));
+}
+
 export function getSettings(): AppSettings {
   try {
-    return JSON.parse(localStorage.getItem(KEYS.SETTINGS) || '{}');
+    const raw = JSON.parse(localStorage.getItem(KEYS.SETTINGS) || 'null') as Partial<AppSettings> | null;
+    if (!raw || !Object.keys(raw).length) return { ...DEFAULT_SETTINGS };
+
+    const merged: AppSettings = { ...DEFAULT_SETTINGS, ...raw };
+    if (shouldMigrateSourcePriority(raw.sourcePriority)) {
+      merged.sourcePriority = [...DEFAULT_SOURCE_PRIORITY];
+      saveSettings(merged);
+    }
+    return merged;
   } catch {
-    return {
-      autoPlay: true,
-      defaultQuality: 'auto',
-      defaultSubtitleLang: 'en',
-      enableOpenSubtitles: false,
-      sourcePriority: ['vidsrcto', 'vidsync', 'vidking', 'rivestream', 'rivestreamAgg', 'vidsrcme', 'rivestreamTorrent'],
-    };
+    return { ...DEFAULT_SETTINGS };
   }
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useChannels } from '@/hooks/useChannels';
+import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { useTMDB, getPoster } from '@/hooks/useTMDB';
 import { filterChannelsByQuery } from '@/lib/searchUtils';
 import { Film, Radio, Tv, Loader2 } from 'lucide-react';
@@ -14,8 +15,9 @@ interface SearchOverlayProps {
 }
 
 export default function SearchOverlay({ query, variant = 'dropdown' }: SearchOverlayProps) {
-  const { setSelectedChannel, setSelectedDetail, setIsSearchOpen } = useApp();
+  const { setSelectedDetail, setIsSearchOpen } = useApp();
   const { channels } = useChannels();
+  const watchChannel = useWatchChannel();
   const { searchMulti } = useTMDB();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [tvShows, setTvShows] = useState<TVShow[]>([]);
@@ -51,7 +53,12 @@ export default function SearchOverlay({ query, variant = 'dropdown' }: SearchOve
   const showEmpty = !loading && !hasResults;
 
   const handleChannelClick = (channel: (typeof channelResults)[0]) => {
-    setSelectedChannel({ id: channel.id, name: channel.name, logo: channel.logo });
+    watchChannel({
+      id: channel.id,
+      name: channel.name,
+      logo: channel.logo,
+      streamUrl: channel.streamUrl,
+    });
     setIsSearchOpen(false);
   };
 

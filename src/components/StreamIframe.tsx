@@ -13,6 +13,12 @@ type StreamIframeProps = {
 const EMBED_ALLOW =
   'autoplay *; fullscreen *; accelerometer *; clipboard-write *; encrypted-media *; gyroscope *; picture-in-picture *';
 
+function withAutoplayParam(url: string): string {
+  if (url.includes('autoplay')) return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}autoplay=1`;
+}
+
 export default function StreamIframe({
   src,
   title,
@@ -23,6 +29,7 @@ export default function StreamIframe({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const iframeSrc = withAutoplayParam(src);
 
   useEffect(() => {
     setLoading(true);
@@ -40,14 +47,14 @@ export default function StreamIframe({
       {failed && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black text-center px-6 z-10">
           <p className="text-sm text-[#9ca3af]">Stream failed to load.</p>
-          <p className="text-xs text-[#6b7280] mt-1">Try another server from the menu below.</p>
+          <p className="text-xs text-[#6b7280] mt-1">Try another server from the menu above.</p>
         </div>
       )}
 
       <iframe
         ref={iframeRef}
-        key={src}
-        src={src}
+        key={iframeSrc}
+        src={iframeSrc}
         title={title}
         className={className}
         allow={EMBED_ALLOW}

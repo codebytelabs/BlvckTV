@@ -1,7 +1,9 @@
+import { getDirectPlayerUrl, getDlhdWrapperUrl } from '@/lib/dlhdPlayerUrls';
+
 const PLAYER_SOURCES = [
-  (id: string) => `https://hamis.romponalis.st/premiumtv/daddy3.php?id=${id}`,
-  (id: string) => `https://dlhd.pk/player/stream-${id}.php`,
-  (id: string) => `https://dlhd.pk/watch/stream-${id}.php`,
+  (id: string) => getDirectPlayerUrl(id),
+  (id: string) => getDlhdWrapperUrl('watch', id),
+  (id: string) => getDlhdWrapperUrl('player', id),
 ];
 
 const IFRAME_RE = /<iframe[^>]+src=["']([^"']+)["']/gi;

@@ -13,13 +13,15 @@ import {
   type SportsEvent,
 } from '@/lib/sportsEvents';
 import { resolveSportsChannel } from '@/lib/sportsChannelResolver';
+import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { Bell, Calendar, Clock, Globe, Play, Radio, Trophy } from 'lucide-react';
 
 const DATE_TABS = ['Today', 'Tomorrow', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'];
 
 function useWatchEvent() {
-  const { setSelectedChannel, showToast } = useApp();
+  const { showToast } = useApp();
   const { channels } = useChannels();
+  const watchChannel = useWatchChannel();
 
   return useCallback(
     (event: SportsEvent) => {
@@ -31,9 +33,9 @@ function useWatchEvent() {
         showToast(`No stream found for ${event.channel}`, 'error');
         return;
       }
-      setSelectedChannel(resolved);
+      watchChannel(resolved);
     },
-    [setSelectedChannel, channels, showToast],
+    [watchChannel, channels, showToast],
   );
 }
 

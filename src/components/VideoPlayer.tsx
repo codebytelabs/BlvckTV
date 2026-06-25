@@ -8,7 +8,7 @@ import type { StreamingSource } from '@/types';
 export default function VideoPlayer() {
   const { selectedVideo, setSelectedVideo, settings, updateContinue, showToast } = useApp();
   const [currentSource, setCurrentSource] = useState<StreamingSource>(
-    (settings.sourcePriority?.[0] || 'vidsrcto') as StreamingSource,
+    (settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource,
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -19,8 +19,20 @@ export default function VideoPlayer() {
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const embedUrl = selectedVideo?.type === 'movie'
-    ? getMovieEmbedUrl(currentSource, selectedVideo.tmdbId)
-    : getTVEmbedUrl(currentSource, selectedVideo?.tmdbId || 0, selectedVideo?.season, selectedVideo?.episode);
+    ? getMovieEmbedUrl(currentSource, selectedVideo.tmdbId, selectedVideo.imdbId)
+    : getTVEmbedUrl(
+        currentSource,
+        selectedVideo?.tmdbId || 0,
+        selectedVideo?.season,
+        selectedVideo?.episode,
+        selectedVideo?.imdbId,
+      );
+
+  useEffect(() => {
+    if (selectedVideo) {
+      setCurrentSource((settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource);
+    }
+  }, [selectedVideo, settings.sourcePriority]);
 
   const activeEmbedUrl = subtitleUrl
     ? `${embedUrl}${embedUrl.includes('?') ? '&' : '?'}sub_url=${encodeURIComponent(subtitleUrl)}`

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem } from '@/types';
+import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem, SelectedVideo } from '@/types';
 import { getWatchlist, addToWatchlist as addWL, removeFromWatchlist as removeWL, isInWatchlist as checkWL, getHistory, addToHistory as addH, getContinueWatching, updateContinueWatching as updateCW, getSettings, saveSettings, removeContinueWatching as removeCW, type AppSettings } from '@/lib/storage';
 
 interface AppState {
@@ -7,8 +7,8 @@ interface AppState {
   setCurrentPage: (page: PageType) => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
-  selectedVideo: { tmdbId: number; type: 'movie' | 'tv'; season?: number; episode?: number; title: string } | null;
-  setSelectedVideo: (v: AppState['selectedVideo']) => void;
+  selectedVideo: SelectedVideo | null;
+  setSelectedVideo: (v: SelectedVideo | null) => void;
   selectedDetail: { id: number; type: 'movie' | 'tv' } | null;
   setSelectedDetail: (v: AppState['selectedDetail']) => void;
   selectedChannel: { id: string; name: string; logo: string; streamUrl?: string } | null;

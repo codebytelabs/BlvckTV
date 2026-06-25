@@ -102,7 +102,7 @@ export function mapDlhdChannel(raw: DlhdRawChannel): Channel {
     country: inferCountry(raw.channel_name, raw.country),
     isLive: true,
     streamUrl: `${DLHD_BASE}/stream/stream-${id}.php`,
-    altPaths: ['player', 'watch', 'plus', 'casting', 'cast', 'stream'],
+    altPaths: ['watch', 'player', 'plus', 'casting', 'cast', 'stream'],
   };
 }
 

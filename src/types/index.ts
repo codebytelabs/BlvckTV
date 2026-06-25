@@ -108,6 +108,15 @@ export interface ContinueWatchingItem {
 
 export type PageType = 'home' | 'movies' | 'tvshows' | 'livetv' | 'sports' | 'watchlist' | 'history' | 'settings';
 
+export type SelectedVideo = {
+  tmdbId: number;
+  type: 'movie' | 'tv';
+  season?: number;
+  episode?: number;
+  title: string;
+  imdbId?: string | null;
+};
+
 export type MovieCatalogMode = 'popular' | 'trending' | 'top_rated' | 'now_playing' | 'upcoming';
 export type TVCatalogMode = 'popular' | 'trending' | 'top_rated' | 'on_air' | 'airing_today';
 

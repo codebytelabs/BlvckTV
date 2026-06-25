@@ -291,7 +291,12 @@ export function useTMDB() {
   [wrap]);
 
   const fetchTVDetails = useCallback((id: number) =>
-    wrap(() => fetchTMDB<TVShow>(`/tv/${id}?language=en-US&append_to_response=credits`)),
+    wrap(async () => {
+      const data = await fetchTMDB<TVShow & { external_ids?: { imdb_id?: string } }>(
+        `/tv/${id}?language=en-US&append_to_response=credits,external_ids`,
+      );
+      return { ...data, imdb_id: data.external_ids?.imdb_id ?? data.imdb_id };
+    }),
   [wrap]);
 
   const fetchTVSeason = useCallback((id: number, season: number) =>

@@ -21,6 +21,9 @@ export function installStreamGuard(): GuardCleanup {
 
   window.open = (...args: Parameters<typeof window.open>) => {
     const target = typeof args[0] === 'string' ? args[0] : args[0]?.toString() ?? '';
+    if (!document.querySelector('[data-player-open="true"]')) {
+      return originalOpen(...args);
+    }
     console.warn('[BlvckTV] Blocked popup:', target || '(empty)');
     return null;
   };
@@ -65,10 +68,19 @@ export function installStreamGuard(): GuardCleanup {
     if (active?.tagName === 'IFRAME') return;
   };
 
+  const onVisibilityChange = () => {
+    if (document.visibilityState !== 'visible') return;
+    const player = document.querySelector('[data-player-open="true"]') as HTMLElement | null;
+    if (player) {
+      player.focus({ preventScroll: true });
+    }
+  };
+
   window.addEventListener('beforeunload', onBeforeUnload);
   document.addEventListener('click', onClickCapture, true);
   document.addEventListener('auxclick', onAuxClick, true);
   window.addEventListener('blur', onBlur);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   return () => {
     window.open = originalOpen;
@@ -76,6 +88,7 @@ export function installStreamGuard(): GuardCleanup {
     document.removeEventListener('click', onClickCapture, true);
     document.removeEventListener('auxclick', onAuxClick, true);
     window.removeEventListener('blur', onBlur);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     installed = false;
   };
 }

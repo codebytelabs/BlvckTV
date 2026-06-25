@@ -1,14 +1,23 @@
 import type { Plugin } from 'vite';
+import { crawlInnerEmbedForPath } from './src/lib/dlhdInnerEmbed';
+import {
+  getDirectPlayerUrl,
+  getDlhdWrapperUrl,
+} from './src/lib/dlhdPlayerUrls';
 
 const PLAYER_SOURCES = [
-  (id: string) => `https://hamis.romponalis.st/premiumtv/daddy3.php?id=${id}`,
-  (id: string) => `https://dlhd.pk/player/stream-${id}.php`,
-  (id: string) => `https://dlhd.pk/watch/stream-${id}.php`,
+  (id: string) => getDirectPlayerUrl(id),
+  (id: string) => getDlhdWrapperUrl('watch', id),
+  (id: string) => getDlhdWrapperUrl('player', id),
 ];
 
 const IFRAME_RE = /<iframe[^>]+src=["']([^"']+)["']/gi;
 const ATOB_RE = /atob\s*\(\s*['"]([A-Za-z0-9+/=]+)['"]\s*\)/;
 const M3U8_RE = /https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*/;
+
+const VALID_PATHS = new Set(['watch', 'player', 'plus', 'casting', 'cast', 'stream']);
+
+const POPUP_BLOCK_SCRIPT = `<script>(function(){var o=window.open;window.open=function(){return null};})();</script>`;
 
 function parseM3u8FromHtml(html: string): string | null {
   const atobMatch = html.match(ATOB_RE);
@@ -50,6 +59,67 @@ async function fetchHtml(url: string): Promise<string | null> {
   }
 }
 
+function buildHlsFramePlayer(id: string): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live</title>
+<style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden}video{width:100%;height:100%;object-fit:contain}</style>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"><\/script>
+${POPUP_BLOCK_SCRIPT}
+</head><body>
+<video id="v" playsinline autoplay muted></video>
+<script>
+(async function(){
+  try {
+    var res = await fetch('/api/dlhd/m3u8?id=${id}', { cache: 'no-store' });
+    var data = await res.json();
+    if (!data.url) throw new Error('no stream');
+    var v = document.getElementById('v');
+    if (window.Hls && Hls.isSupported()) {
+      var hls = new Hls({ lowLatencyMode: true, enableWorker: true });
+      hls.loadSource(data.url);
+      hls.attachMedia(v);
+      hls.on(Hls.Events.MANIFEST_PARSED, function(){ v.play().catch(function(){}); });
+      hls.on(Hls.Events.ERROR, function(ev, d){
+        if (d.fatal) document.body.innerHTML='<p style="color:#aaa;text-align:center;padding:2rem">Stream unavailable</p>';
+      });
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = data.url;
+      v.play().catch(function(){});
+    } else {
+      throw new Error('no hls support');
+    }
+  } catch (e) {
+    document.body.innerHTML='<p style="color:#aaa;text-align:center;padding:2rem">Stream unavailable</p>';
+  }
+})();
+<\/script></body></html>`;
+}
+
+function isDlhdWrapperHtml(html: string): boolean {
+  return /<iframe[^>]+src=["']https?:\/\//i.test(html);
+}
+
+/** dlhd.pk wrapper first; fall back to proxied direct player HTML when the site is down. */
+async function fetchStreamPageHtml(path: string, id: string): Promise<string | null> {
+  const wrapperHtml = await fetchHtml(getDlhdWrapperUrl(path, id));
+  if (wrapperHtml && isDlhdWrapperHtml(wrapperHtml)) return wrapperHtml;
+
+  const playerHtml = await fetchHtml(getDirectPlayerUrl(id));
+  if (playerHtml) return playerHtml;
+
+  return buildHlsFramePlayer(id);
+}
+
+function injectPopupBlock(html: string): string {
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${POPUP_BLOCK_SCRIPT}</head>`);
+  }
+  return POPUP_BLOCK_SCRIPT + html;
+}
+
 async function resolveM3u8(channelId: string): Promise<string | null> {
   const id = channelId.replace(/\D/g, '') || channelId;
   const visited = new Set<string>();
@@ -86,9 +156,87 @@ export function dlhdM3u8Plugin(): Plugin {
     name: 'dlhd-m3u8',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith('/api/dlhd/m3u8')) return next();
+        if (!req.url?.startsWith('/api/dlhd/')) return next();
 
         const url = new URL(req.url, 'http://localhost');
+
+        if (req.url.startsWith('/api/dlhd/embed-inner')) {
+          const path = url.searchParams.get('path') || 'watch';
+          const id = url.searchParams.get('id')?.replace(/\D/g, '');
+          if (!id || !VALID_PATHS.has(path)) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Bad request' }));
+            return;
+          }
+
+          try {
+            let embedUrl = await crawlInnerEmbedForPath(id, path, fetchHtml);
+            if (!embedUrl) {
+              embedUrl = getDirectPlayerUrl(id);
+            }
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            if (embedUrl) {
+              res.end(JSON.stringify({ url: embedUrl }));
+            } else {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ error: 'No embeddable player for this path' }));
+            }
+          } catch {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: 'Embed resolve failed' }));
+          }
+          return;
+        }
+
+        if (req.url.startsWith('/api/dlhd/resolve')) {
+          const path = url.searchParams.get('path') || 'watch';
+          const id = url.searchParams.get('id')?.replace(/\D/g, '');
+          if (!id || !VALID_PATHS.has(path)) {
+            res.statusCode = 400;
+            res.end('Bad request');
+            return;
+          }
+
+          const html = await fetchStreamPageHtml(path, id);
+          if (!html) {
+            res.statusCode = 502;
+            res.end('Failed to load stream page');
+            return;
+          }
+
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(html);
+          return;
+        }
+
+        if (req.url.startsWith('/api/dlhd/frame')) {
+          const path = url.searchParams.get('path') || 'watch';
+          const id = url.searchParams.get('id')?.replace(/\D/g, '');
+          if (!id || !VALID_PATHS.has(path)) {
+            res.statusCode = 400;
+            res.end('Bad request');
+            return;
+          }
+
+          const html = await fetchStreamPageHtml(path, id);
+          if (!html) {
+            res.statusCode = 502;
+            res.end('Failed to load stream page');
+            return;
+          }
+
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(injectPopupBlock(html));
+          return;
+        }
+
+        if (!req.url.startsWith('/api/dlhd/m3u8')) return next();
+
         const id = url.searchParams.get('id');
         if (!id) {
           res.statusCode = 400;

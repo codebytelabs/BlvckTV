@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useApp } from '@/context/AppContext';
+import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { useChannelLogo } from '@/hooks/useChannelLogo';
 import { getCategoryGradient } from '@/lib/channelLogos';
 import { Play, Tv } from 'lucide-react';
@@ -19,12 +19,12 @@ function getChannelInitials(name: string): string {
 }
 
 export default function ChannelCard({ channel, compact }: ChannelCardProps) {
-  const { setSelectedChannel } = useApp();
+  const watchChannel = useWatchChannel();
   const { logoUrl, loading } = useChannelLogo(channel.name, channel.logo);
   const [imgFailed, setImgFailed] = useState(false);
 
   const handleClick = () => {
-    setSelectedChannel({
+    watchChannel({
       id: channel.id,
       name: channel.name,
       logo: logoUrl || channel.logo,

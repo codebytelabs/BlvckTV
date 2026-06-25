@@ -1,4 +1,5 @@
 import type { Channel } from '@/types';
+import { resolveLiveChannel, type ResolvedLiveChannel } from '@/lib/liveChannelResolver';
 
 /** Known DLHD ids for common broadcaster labels used in sports schedules. */
 const BROADCAST_IDS: Record<string, string> = {
@@ -72,12 +73,7 @@ export function resolveChannelIdByName(label: string, channels: Channel[]): stri
   return best && best.score >= 60 ? best.id : undefined;
 }
 
-export type ResolvedSportsChannel = {
-  id: string;
-  name: string;
-  logo: string;
-  streamUrl?: string;
-};
+export type ResolvedSportsChannel = ResolvedLiveChannel;
 
 export function resolveSportsChannel(
   input: {
@@ -91,22 +87,28 @@ export function resolveSportsChannel(
 
   if (input.channelId) {
     const matched = channels.find(c => c.id === input.channelId);
-    return {
-      id: input.channelId,
-      name: displayName,
-      logo: matched?.logo ?? '',
-      streamUrl: matched?.streamUrl,
-    };
+    return resolveLiveChannel(
+      {
+        id: input.channelId,
+        name: displayName,
+        logo: matched?.logo ?? '',
+        streamUrl: matched?.streamUrl,
+      },
+      channels,
+    );
   }
 
   const resolvedId = resolveChannelIdByName(input.channel, channels);
   if (!resolvedId) return null;
 
   const matched = channels.find(c => c.id === resolvedId);
-  return {
-    id: resolvedId,
-    name: matched?.name ?? displayName,
-    logo: matched?.logo ?? '',
-    streamUrl: matched?.streamUrl,
-  };
+  return resolveLiveChannel(
+    {
+      id: resolvedId,
+      name: matched?.name ?? displayName,
+      logo: matched?.logo ?? '',
+      streamUrl: matched?.streamUrl,
+    },
+    channels,
+  );
 }

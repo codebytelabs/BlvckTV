@@ -1,11 +1,13 @@
 import { useApp } from '@/context/AppContext';
+import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { getPoster } from '@/hooks/useTMDB';
 import { clearHistory } from '@/lib/storage';
 import { RotateCcw, Trash2, Film, Tv, Radio } from 'lucide-react';
 import type { HistoryItem } from '@/types';
 
 export default function HistoryPage() {
-  const { history, refreshHistory, setSelectedVideo, setSelectedChannel } = useApp();
+  const { history, refreshHistory, setSelectedVideo } = useApp();
+  const watchChannel = useWatchChannel();
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -18,7 +20,11 @@ export default function HistoryPage() {
 
   const handleClick = (item: HistoryItem) => {
     if (item.type === 'live') {
-      setSelectedChannel({ id: String(item.id), name: item.title, logo: item.poster_path || '' });
+      watchChannel({
+        id: String(item.id),
+        name: item.title,
+        logo: item.poster_path || '',
+      });
     } else {
       setSelectedVideo({ tmdbId: item.id, type: item.type, title: item.title, season: item.season, episode: item.episode });
     }
