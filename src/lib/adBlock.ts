@@ -118,9 +118,9 @@ export function pickBestPlayerIframe(candidates: string[]): string | null {
     .filter(url => !isBlockedUrl(url) && !isDlhdHost(url))
     .map(url => {
       const lower = url.toLowerCase();
-      let score = 0;
+      let score = 1;
       if (/daddy\d*\.php|premiumtv|strm\/|\/embed\//i.test(lower)) score += 10;
-      if (/wikisport|romponalis|embed\.st/i.test(lower)) score += 8;
+      if (/wikisport|romponalis|embed\.st|sportshub/i.test(lower)) score += 8;
       if (/\.m3u8|\.mp4/i.test(lower)) score += 12;
       if (/ads|pop|banner|track/i.test(lower)) score -= 20;
       return { url, score };

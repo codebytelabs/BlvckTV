@@ -1,10 +1,5 @@
-import { pickBestPlayerIframe, isDlhdHost } from './adBlock';
-import {
-  getDirectPlayerUrl,
-  getDlhdWrapperUrl,
-  isPlayableStreamHtml,
-  normalizeChannelId,
-} from './dlhdPlayerUrls';
+import { pickBestPlayerIframe, isDlhdHost, isBlockedUrl } from './adBlock';
+import { getDlhdWrapperUrl } from './dlhdPlayerUrls';
 
 export { isDlhdHost };
 
@@ -29,9 +24,10 @@ export function toAbsoluteUrl(candidate: string, base: string): string {
 export function pickInnerEmbed(candidates: string[], pageUrl: string): string | null {
   const absolute = candidates
     .map(c => toAbsoluteUrl(c, pageUrl))
-    .filter(u => u.startsWith('http') && !isDlhdHost(u));
+    .filter(u => u.startsWith('http') && !isDlhdHost(u) && !isBlockedUrl(u));
 
-  return pickBestPlayerIframe(absolute) ?? absolute[0] ?? null;
+  if (absolute.length === 0) return null;
+  return pickBestPlayerIframe(absolute) ?? absolute[0];
 }
 
 export type FetchHtmlFn = (url: string) => Promise<string | null>;
@@ -47,7 +43,6 @@ export async function crawlInnerEmbedForPath(
   path: string,
   fetchHtml: FetchHtmlFn,
 ): Promise<string | null> {
-  const id = normalizeChannelId(channelId);
   const wrapperUrl = getDlhdWrapperUrl(path, channelId);
   const visited = new Set<string>();
 
@@ -71,14 +66,7 @@ export async function crawlInnerEmbedForPath(
     return null;
   }
 
-  const fromWrapper = await crawl(wrapperUrl, 0);
-  if (fromWrapper) return fromWrapper;
-
-  const directUrl = getDirectPlayerUrl(id);
-  const directHtml = await fetchHtml(directUrl);
-  if (directHtml && isPlayableStreamHtml(directHtml)) return directUrl;
-
-  return null;
+  return crawl(wrapperUrl, 0);
 }
 
 export function wrapperPageUrl(path: string, channelId: string): string {

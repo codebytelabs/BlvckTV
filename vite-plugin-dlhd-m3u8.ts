@@ -7,8 +7,9 @@ import {
 
 const PLAYER_SOURCES = [
   (id: string) => getDirectPlayerUrl(id),
-  (id: string) => getDlhdWrapperUrl('watch', id),
-  (id: string) => getDlhdWrapperUrl('player', id),
+  ...(['watch', 'player', 'plus', 'casting', 'cast', 'stream'] as const).map(
+    (path) => (id: string) => getDlhdWrapperUrl(path, id),
+  ),
 ];
 
 const IFRAME_RE = /<iframe[^>]+src=["']([^"']+)["']/gi;
@@ -100,14 +101,6 @@ async function serveProxiedSegment(targetUrl: string, res: { statusCode: number;
   res.end(buffer);
 }
 
-function injectFreshM3u8IntoClappr(html: string, playlistPath: string): string {
-  const encoded = Buffer.from(playlistPath).toString('base64');
-  if (/atob\s*\(\s*['"][^'"]+['"]\s*\)/.test(html)) {
-    return html.replace(/atob\s*\(\s*['"][^'"]+['"]\s*\)/, `atob('${encoded}')`);
-  }
-  return html;
-}
-
 function isPlayablePlayerHtml(html: string): boolean {
   return (
     /<iframe[^>]+src=["']https?:\/\//i.test(html) ||
@@ -156,6 +149,28 @@ async function fetchHtml(url: string): Promise<string | null> {
   }
 }
 
+function buildEmbedFramePage(embedUrl: string): string {
+  const safeSrc = embedUrl.replace(/"/g, '&quot;');
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live</title>
+<style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden}iframe{border:0;width:100%;height:100%}</style>
+${POPUP_BLOCK_SCRIPT}
+</head><body>
+<iframe src="${safeSrc}" allow="autoplay *; fullscreen *; encrypted-media *; picture-in-picture *" referrerpolicy="no-referrer"></iframe>
+</body></html>`;
+}
+
+function injectFreshM3u8IntoClappr(html: string, playlistPath: string): string {
+  const encoded = Buffer.from(playlistPath).toString('base64');
+  if (/atob\s*\(\s*['"][^'"]+['"]\s*\)/.test(html)) {
+    return html.replace(/atob\s*\(\s*['"][^'"]+['"]\s*\)/, `atob('${encoded}')`);
+  }
+  return html;
+}
+
 function buildHlsFramePlayer(id: string): string {
   return `<!DOCTYPE html>
 <html lang="en"><head>
@@ -193,31 +208,43 @@ ${POPUP_BLOCK_SCRIPT}
 <\/script></body></html>`;
 }
 
-function isDlhdIframeWrapper(html: string): boolean {
-  return /<iframe[^>]+src=["']https?:\/\//i.test(html);
-}
-
-/**
- * Path-specific DLHD wrapper when available.
- * Otherwise Clappr (daddy3) with same-origin proxied playlist, then inline HLS player.
- */
-async function fetchStreamPageHtml(path: string, id: string): Promise<string | null> {
-  const wrapperHtml = await fetchHtml(getDlhdWrapperUrl(path, id));
-  if (wrapperHtml && isDlhdIframeWrapper(wrapperHtml)) {
-    return wrapperHtml;
-  }
-
+async function fetchSharedPlayerFallback(id: string): Promise<string> {
   const playlistPath = `/api/dlhd/playlist?id=${encodeURIComponent(id)}`;
   const playerHtml = await fetchHtml(getDirectPlayerUrl(id));
   if (playerHtml && /Clappr\.Player/i.test(playerHtml)) {
     return injectFreshM3u8IntoClappr(playerHtml, playlistPath);
   }
-
   if (playerHtml && isPlayablePlayerHtml(playerHtml)) {
     return playerHtml;
   }
-
   return buildHlsFramePlayer(id);
+}
+
+/**
+ * Path-first stream page resolution:
+ * 1. Path-specific DLHD wrapper HTML when available
+ * 2. Path-specific wrapper iframe (browser loads mirror even if Node fetch failed)
+ * 3. Path-specific inner embed when crawl finds a unique player for this mirror
+ * 4. Shared HLS fallback only when dlhd.pk is unreachable (same stream, but playback works)
+ */
+async function fetchStreamPageHtml(path: string, id: string): Promise<string> {
+  const wrapperUrl = getDlhdWrapperUrl(path, id);
+  const wrapperHtml = await fetchHtml(wrapperUrl);
+
+  if (wrapperHtml && isPlayablePlayerHtml(wrapperHtml)) {
+    return wrapperHtml;
+  }
+
+  if (wrapperHtml !== null) {
+    return buildEmbedFramePage(wrapperUrl);
+  }
+
+  const innerUrl = await crawlInnerEmbedForPath(id, path, fetchHtml);
+  if (innerUrl) {
+    return buildEmbedFramePage(innerUrl);
+  }
+
+  return fetchSharedPlayerFallback(id);
 }
 
 function injectPopupBlock(html: string): string {
@@ -300,10 +327,7 @@ export function dlhdM3u8Plugin(): Plugin {
           }
 
           try {
-            let embedUrl = await crawlInnerEmbedForPath(id, path, fetchHtml);
-            if (!embedUrl) {
-              embedUrl = getDirectPlayerUrl(id);
-            }
+            const embedUrl = await crawlInnerEmbedForPath(id, path, fetchHtml);
             res.setHeader('Content-Type', 'application/json');
             res.setHeader('Access-Control-Allow-Origin', '*');
             if (embedUrl) {
@@ -330,12 +354,6 @@ export function dlhdM3u8Plugin(): Plugin {
           }
 
           const html = await fetchStreamPageHtml(path, id);
-          if (!html) {
-            res.statusCode = 502;
-            res.end('Failed to load stream page');
-            return;
-          }
-
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
           res.end(html);
@@ -352,12 +370,6 @@ export function dlhdM3u8Plugin(): Plugin {
           }
 
           const html = await fetchStreamPageHtml(path, id);
-          if (!html) {
-            res.statusCode = 502;
-            res.end('Failed to load stream page');
-            return;
-          }
-
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
           res.end(injectPopupBlock(html));

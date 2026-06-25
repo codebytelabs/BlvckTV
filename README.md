@@ -43,7 +43,13 @@ yarn android:apk
 ```
 
 APK output: `android/app/build/outputs/apk/debug/app-debug.apk`  
-Also copied to: `releases/BlvckTV-1.0.0-debug.apk` (local, not in git)
+Also copied to: `releases/BlvckTV-1.0.2-debug.apk` (local, not in git)
+
+Regenerate launcher icons from the webapp logo (`public/logo.png`):
+
+```bash
+./scripts/generate-android-icons.sh
+```
 
 Open in Android Studio (optional):
 

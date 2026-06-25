@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { useChannelLogo } from '@/hooks/useChannelLogo';
+import { useApp } from '@/context/AppContext';
 import { getCategoryGradient } from '@/lib/channelLogos';
+import FavoriteChannelButton from '@/components/FavoriteChannelButton';
 import { Play, Tv } from 'lucide-react';
 import type { Channel } from '@/types';
 
@@ -20,8 +22,10 @@ function getChannelInitials(name: string): string {
 
 export default function ChannelCard({ channel, compact }: ChannelCardProps) {
   const watchChannel = useWatchChannel();
+  const { isFavoriteChannel } = useApp();
   const { logoUrl, loading } = useChannelLogo(channel.name, channel.logo);
   const [imgFailed, setImgFailed] = useState(false);
+  const favorited = isFavoriteChannel(channel.id);
 
   const handleClick = () => {
     watchChannel({
@@ -82,6 +86,10 @@ export default function ChannelCard({ channel, compact }: ChannelCardProps) {
             <span className="text-[10px] font-bold text-[#ef4444] uppercase">Live</span>
           </div>
         )}
+
+        <div className={`absolute top-2 right-2 z-10 ${favorited ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
+          <FavoriteChannelButton channel={channel} size={14} />
+        </div>
       </div>
 
       <div className="p-3">

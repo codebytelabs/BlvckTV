@@ -3,6 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { useChannels, type ChannelsSource } from '@/hooks/useChannels';
 import { useIsMobileLayout } from '@/hooks/useMediaQuery';
 import { filterChannelsByQuery } from '@/lib/searchUtils';
+import { resolveFavoriteChannels } from '@/lib/storage';
 import {
   Sheet,
   SheetContent,
@@ -11,7 +12,9 @@ import {
   SheetFooter,
 } from '@/components/ui/sheet';
 import ChannelCard from '@/components/ChannelCard';
-import { SlidersHorizontal, Radio, RefreshCw, AlertCircle } from 'lucide-react';
+import { SlidersHorizontal, Radio, RefreshCw, AlertCircle, Star } from 'lucide-react';
+
+type ViewMode = 'all' | 'favorites';
 
 const SOURCE_LABELS: Record<ChannelsSource, { label: string; color: string; bg: string }> = {
   api: { label: 'API', color: '#06b6d4', bg: 'rgba(6,182,212,0.15)' },
@@ -21,9 +24,10 @@ const SOURCE_LABELS: Record<ChannelsSource, { label: string; color: string; bg: 
 };
 
 export default function LiveTVPage() {
-  const { searchQuery } = useApp();
+  const { searchQuery, favoriteChannels } = useApp();
   const isMobile = useIsMobileLayout();
   const { channels, categories, countries, liveChannels, loading, error, source, refetch } = useChannels();
+  const [viewMode, setViewMode] = useState<ViewMode>('all');
   const [category, setCategory] = useState('');
   const [country, setCountry] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -44,12 +48,24 @@ export default function LiveTVPage() {
     setShowFilters(false);
   };
 
+  const favoriteList = useMemo(
+    () => resolveFavoriteChannels(favoriteChannels, channels),
+    [favoriteChannels, channels],
+  );
+
   const filtered = useMemo(() => {
-    let result = searchQuery ? filterChannelsByQuery(channels, searchQuery) : [...channels];
+    let result = viewMode === 'favorites'
+      ? [...favoriteList]
+      : searchQuery
+        ? filterChannelsByQuery(channels, searchQuery)
+        : [...channels];
     if (category) result = result.filter(c => c.category === category);
     if (country) result = result.filter(c => c.country === country);
+    if (viewMode === 'favorites' && searchQuery) {
+      result = filterChannelsByQuery(result, searchQuery);
+    }
     return result;
-  }, [channels, searchQuery, category, country]);
+  }, [channels, favoriteList, searchQuery, category, country, viewMode]);
 
   const sourceMeta = SOURCE_LABELS[source];
 
@@ -85,6 +101,23 @@ export default function LiveTVPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode(viewMode === 'favorites' ? 'all' : 'favorites')}
+            className={`touch-target flex items-center gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.45)] ${
+              viewMode === 'favorites'
+                ? 'bg-[rgba(245,158,11,0.15)] border-[rgba(245,158,11,0.35)] text-[#f59e0b]'
+                : 'bg-[#1e1e2d] border-[rgba(139,92,246,0.15)] text-[#9ca3af] hover:text-[#f1f1f4]'
+            }`}
+          >
+            <Star size={16} fill={viewMode === 'favorites' ? 'currentColor' : 'none'} />
+            <span className="hidden sm:inline">Favorites</span>
+            {favoriteChannels.length > 0 && (
+              <span className="rounded-full bg-[rgba(245,158,11,0.2)] px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+                {favoriteChannels.length}
+              </span>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => void refetch()}
@@ -168,9 +201,15 @@ export default function LiveTVPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20">
-          <Radio size={64} className="text-[#6b7280] mb-4" style={{ opacity: 0.3 }} />
-          <p className="text-lg text-[#9ca3af]">No channels found</p>
-          <p className="text-sm text-[#6b7280] mt-1">Try adjusting your filters or search</p>
+          <Star size={64} className="text-[#6b7280] mb-4" style={{ opacity: viewMode === 'favorites' ? 0.5 : 0.3 }} />
+          <p className="text-lg text-[#9ca3af]">
+            {viewMode === 'favorites' ? 'No favorite channels yet' : 'No channels found'}
+          </p>
+          <p className="text-sm text-[#6b7280] mt-1">
+            {viewMode === 'favorites'
+              ? 'Tap the star on any channel to save it here'
+              : 'Try adjusting your filters or search'}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3 sm:gap-4">

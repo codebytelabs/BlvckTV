@@ -1,6 +1,13 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem, SelectedVideo } from '@/types';
-import { getWatchlist, addToWatchlist as addWL, removeFromWatchlist as removeWL, isInWatchlist as checkWL, getHistory, addToHistory as addH, getContinueWatching, updateContinueWatching as updateCW, getSettings, saveSettings, removeContinueWatching as removeCW, type AppSettings } from '@/lib/storage';
+import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem, SelectedVideo, FavoriteChannel } from '@/types';
+import {
+  getWatchlist, addToWatchlist as addWL, removeFromWatchlist as removeWL, isInWatchlist as checkWL,
+  getHistory, addToHistory as addH,
+  getContinueWatching, updateContinueWatching as updateCW, removeContinueWatching as removeCW,
+  getSettings, saveSettings,
+  getFavoriteChannels, toggleFavoriteChannel as toggleFav, isFavoriteChannel as checkFav,
+  type AppSettings,
+} from '@/lib/storage';
 
 interface AppState {
   currentPage: PageType;
@@ -17,6 +24,10 @@ interface AppState {
   refreshWatchlist: () => void;
   toggleWatchlist: (item: WatchItem) => void;
   isWatchlisted: (id: number, type: 'movie' | 'tv') => boolean;
+  favoriteChannels: FavoriteChannel[];
+  refreshFavoriteChannels: () => void;
+  toggleFavoriteChannel: (channel: FavoriteChannel) => boolean;
+  isFavoriteChannel: (id: string) => boolean;
   history: HistoryItem[];
   refreshHistory: () => void;
   addHistory: (item: HistoryItem) => void;
@@ -43,6 +54,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedDetail, setSelectedDetail] = useState<AppState['selectedDetail']>(null);
   const [selectedChannel, setSelectedChannel] = useState<AppState['selectedChannel']>(null);
   const [watchlist, setWatchlist] = useState<WatchItem[]>(getWatchlist());
+  const [favoriteChannels, setFavoriteChannels] = useState<FavoriteChannel[]>(getFavoriteChannels());
   const [history, setHistory] = useState<HistoryItem[]>(getHistory());
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>(getContinueWatching());
   const [settings, setSettings] = useState<AppSettings>(getSettings());
@@ -51,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<AppState['toast']>(null);
 
   const refreshWatchlist = useCallback(() => setWatchlist(getWatchlist()), []);
+  const refreshFavoriteChannels = useCallback(() => setFavoriteChannels(getFavoriteChannels()), []);
   const refreshHistory = useCallback(() => setHistory(getHistory()), []);
   const refreshContinueWatching = useCallback(() => setContinueWatching(getContinueWatching()), []);
 
@@ -64,6 +77,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshWatchlist]);
 
   const isWatchlisted = useCallback((id: number, type: 'movie' | 'tv') => checkWL(id, type), []);
+
+  const toggleFavoriteChannel = useCallback((channel: FavoriteChannel) => {
+    const added = toggleFav(channel);
+    refreshFavoriteChannels();
+    return added;
+  }, [refreshFavoriteChannels]);
+
+  const isFavoriteChannel = useCallback((id: string) => checkFav(id), []);
 
   const addHistory = useCallback((item: HistoryItem) => {
     addH(item);
@@ -98,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedDetail, setSelectedDetail,
       selectedChannel, setSelectedChannel,
       watchlist, refreshWatchlist, toggleWatchlist, isWatchlisted,
+      favoriteChannels, refreshFavoriteChannels, toggleFavoriteChannel, isFavoriteChannel,
       history, refreshHistory, addHistory,
       continueWatching, refreshContinueWatching, updateContinue, removeContinue,
       settings, saveAppSettings,

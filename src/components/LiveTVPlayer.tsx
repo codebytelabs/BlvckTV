@@ -14,9 +14,11 @@ import {
   LIVE_PATH_LABELS,
   DEFAULT_LIVE_PATH,
   sortLivePaths,
+  type LiveChannelPath,
 } from '@/lib/streamingSources';
 import HlsPlayer from '@/components/HlsPlayer';
 import StreamIframe from '@/components/StreamIframe';
+import FavoriteChannelButton from '@/components/FavoriteChannelButton';
 import LivePlayerSidebar from '@/components/LivePlayerSidebar';
 import { useIsMobileLayout } from '@/hooks/useMediaQuery';
 import {
@@ -54,12 +56,14 @@ export default function LiveTVPlayer() {
   const loadGen = useRef(0);
   const serverMenuRef = useRef<HTMLDivElement>(null);
   const autoFallbackRef = useRef(true);
+  const tryNextServerRef = useRef<() => void>(() => {});
+  const lastWorkingRef = useRef<{ server: LiveServer; src: string } | null>(null);
 
   const handleClose = useCallback(() => {
     setSelectedChannel(null);
   }, [setSelectedChannel]);
 
-  const loadChannel = useCallback(async (channelId: string, server: LiveServer, streamUrl?: string) => {
+  const loadChannel = useCallback(async (channelId: string, server: LiveServer, _streamUrl?: string) => {
     const gen = ++loadGen.current;
     setLoading(true);
     setM3u8Url(null);
@@ -85,17 +89,6 @@ export default function LiveTVPlayer() {
     setMode('iframe');
     const src = await resolveLiveIframeSrc(channelId, server);
     if (gen !== loadGen.current) return;
-
-    if (!src) {
-      if (autoFallbackRef.current) {
-        autoFallbackRef.current = false;
-        setCurrentServer('hls');
-        void loadChannel(channelId, 'hls', streamUrl);
-        return;
-      }
-      setLoading(false);
-      return;
-    }
 
     setIframeUrl(src);
     setLoading(false);
@@ -182,7 +175,11 @@ export default function LiveTVPlayer() {
     if (!selectedChannel) return;
 
     const iframePaths = sortLivePaths(availablePaths);
-    const idx = iframePaths.indexOf(String(currentServer));
+    const pathKey =
+      currentServer !== 'hls' && iframePaths.includes(currentServer as LiveChannelPath)
+        ? (currentServer as LiveChannelPath)
+        : null;
+    const idx = pathKey ? iframePaths.indexOf(pathKey) : -1;
     const nextIframe = idx >= 0 ? iframePaths[idx + 1] : iframePaths[0];
 
     if (nextIframe && currentServer !== 'hls') {
@@ -197,13 +194,32 @@ export default function LiveTVPlayer() {
     }
   }, [selectedChannel, availablePaths, currentServer, channelStreamUrl, loadChannel]);
 
+  useEffect(() => {
+    tryNextServerRef.current = tryNextServer;
+  }, [tryNextServer]);
+
+  const handleIframeLoad = useCallback(() => {
+    if (iframeUrl && currentServer !== 'hls') {
+      lastWorkingRef.current = { server: currentServer, src: iframeUrl };
+    }
+  }, [iframeUrl, currentServer]);
+
   const handleIframeError = useCallback(() => {
-    if (!selectedChannel || !autoFallbackRef.current) {
+    if (!selectedChannel) return;
+
+    if (!autoFallbackRef.current) {
+      const last = lastWorkingRef.current;
+      if (last && last.server !== currentServer) {
+        setCurrentServer(last.server);
+        setIframeUrl(last.src);
+        return;
+      }
       setIframeUrl(null);
       return;
     }
+
     tryNextServer();
-  }, [selectedChannel, tryNextServer]);
+  }, [selectedChannel, currentServer, tryNextServer]);
 
   const retry = useCallback(() => {
     if (selectedChannel) {
@@ -309,6 +325,34 @@ export default function LiveTVPlayer() {
             </button>
           )}
 
+          {selectedChannel && (
+            <>
+              <FavoriteChannelButton
+                channel={{
+                  id: selectedChannel.id,
+                  name: selectedChannel.name,
+                  logo: selectedChannel.logo,
+                  category: channels.find(c => c.id === selectedChannel.id)?.category ?? 'Live',
+                  country: channels.find(c => c.id === selectedChannel.id)?.country ?? '—',
+                  streamUrl: selectedChannel.streamUrl,
+                }}
+                showLabel
+                className="hidden sm:inline-flex"
+              />
+              <FavoriteChannelButton
+                channel={{
+                  id: selectedChannel.id,
+                  name: selectedChannel.name,
+                  logo: selectedChannel.logo,
+                  category: channels.find(c => c.id === selectedChannel.id)?.category ?? 'Live',
+                  country: channels.find(c => c.id === selectedChannel.id)?.country ?? '—',
+                  streamUrl: selectedChannel.streamUrl,
+                }}
+                className="sm:hidden"
+              />
+            </>
+          )}
+
           <button
             type="button"
             onClick={retry}
@@ -369,6 +413,7 @@ export default function LiveTVPlayer() {
               src={iframeUrl}
               title={selectedChannel.name}
               variant="live"
+              onLoad={handleIframeLoad}
               onError={handleIframeError}
             />
           ) : (

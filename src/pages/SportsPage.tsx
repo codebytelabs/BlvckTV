@@ -1,8 +1,10 @@
-import { useState, useCallback, type KeyboardEvent } from 'react';
+import { useState, useCallback, useMemo, type KeyboardEvent } from 'react';
 import ChannelCard from '@/components/ChannelCard';
+import FavoriteChannelButton from '@/components/FavoriteChannelButton';
 import { useApp } from '@/context/AppContext';
 import { useChannels } from '@/hooks/useChannels';
 import { useSportsEvents } from '@/hooks/useSportsEvents';
+import { resolveFavoriteChannels } from '@/lib/storage';
 import {
   formatEventDate,
   formatEventTime,
@@ -12,7 +14,31 @@ import {
 } from '@/lib/sportsEvents';
 import { resolveSportsChannel } from '@/lib/sportsChannelResolver';
 import { useWatchChannel } from '@/hooks/useWatchChannel';
-import { Bell, Calendar, Clock, Globe, Play, Radio, Trophy } from 'lucide-react';
+import { Bell, Calendar, Clock, Globe, Play, Radio, Star, Trophy } from 'lucide-react';
+
+function FavoriteEventChannelButton({ event }: { event: SportsEvent }) {
+  const { channels } = useChannels();
+  const resolved = resolveSportsChannel(
+    { channelId: event.channelId, channel: event.channel, channelName: event.channelName },
+    channels,
+  );
+  if (!resolved) return null;
+  const matched = channels.find(c => c.id === resolved.id);
+  return (
+    <FavoriteChannelButton
+      channel={{
+        id: resolved.id,
+        name: resolved.name,
+        logo: resolved.logo,
+        streamUrl: resolved.streamUrl,
+        category: matched?.category ?? 'Sports',
+        country: matched?.country ?? '—',
+      }}
+      size={12}
+      className="w-7 h-7"
+    />
+  );
+}
 
 function useWatchEvent() {
   const { showToast } = useApp();
@@ -159,6 +185,7 @@ function LiveMatchCard({ event, now }: { event: SportsEvent; now: number }) {
           {event.channelName ?? event.channel}
         </span>
         <div className="flex items-center gap-2">
+          <FavoriteEventChannelButton event={event} />
           <span className="text-[10px] text-[#6b7280]">
             {startingSoon
               ? `Starts ${formatEventTime(event.startTime)} · ${timeUntilEvent(event.startTime, now)}`
@@ -200,7 +227,10 @@ function UpcomingEventRow({ event, now }: { event: SportsEvent; now: number }) {
       <div className="text-right shrink-0">
         <p className="text-xs font-semibold text-[#f1f1f4]">{formatEventTime(event.startTime)}</p>
         <p className="text-[10px] text-[#06b6d4]">{timeUntilEvent(event.startTime, now)}</p>
-        <span className="text-[10px] text-[#6b7280] mt-1 block">{event.channelName ?? event.channel}</span>
+        <div className="flex items-center justify-end gap-1.5 mt-1">
+          <span className="text-[10px] text-[#6b7280]">{event.channelName ?? event.channel}</span>
+          <FavoriteEventChannelButton event={event} />
+        </div>
       </div>
       {canWatch ? (
         <WatchButton event={event} label="Watch" />
@@ -254,7 +284,8 @@ function MajorEventCard({ event }: { event: SportsEvent }) {
 
 export default function SportsPage() {
   const [activeTab, setActiveTab] = useState(0);
-  const { sportsChannels } = useChannels();
+  const { favoriteChannels } = useApp();
+  const { sportsChannels, channels } = useChannels();
   const {
     now,
     liveEvents,
@@ -266,6 +297,12 @@ export default function SportsPage() {
   } = useSportsEvents();
 
   const dayEvents = eventsForDay(activeTab);
+
+  const favoriteSportsChannels = useMemo(() => {
+    const resolved = resolveFavoriteChannels(favoriteChannels, channels);
+    const sportsIds = new Set(sportsChannels.map(c => c.id));
+    return resolved.filter(c => sportsIds.has(c.id));
+  }, [favoriteChannels, channels, sportsChannels]);
 
   return (
     <div className="space-y-10 pb-10">
@@ -406,6 +443,25 @@ export default function SportsPage() {
           </div>
         )}
       </section>
+
+      {/* Favorite sports channels */}
+      {favoriteSportsChannels.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Star size={18} className="text-[#f59e0b]" fill="currentColor" />
+            <h2 className="text-lg font-bold text-[#f1f1f4]">Favorite Channels</h2>
+            <span className="text-xs font-semibold text-[#9ca3af]">{favoriteSportsChannels.length}</span>
+          </div>
+          <div
+            className="grid gap-4"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
+          >
+            {favoriteSportsChannels.map(channel => (
+              <ChannelCard key={channel.id} channel={channel} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Sports channels */}
       <section>

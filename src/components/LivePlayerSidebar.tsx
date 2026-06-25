@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
+import { useApp } from '@/context/AppContext';
 import { useChannelLogo } from '@/hooks/useChannelLogo';
 import { useSportsEvents } from '@/hooks/useSportsEvents';
+import { resolveFavoriteChannels } from '@/lib/storage';
+import FavoriteChannelButton from '@/components/FavoriteChannelButton';
 import {
   formatEventTime,
   timeUntilEvent,
@@ -8,7 +11,7 @@ import {
 } from '@/lib/sportsEvents';
 import { filterChannelsByQuery } from '@/lib/searchUtils';
 import { getCategoryGradient } from '@/lib/channelLogos';
-import { Play, Radio, Search, Trophy, Tv } from 'lucide-react';
+import { Play, Radio, Search, Star, Trophy, Tv } from 'lucide-react';
 import type { Channel } from '@/types';
 
 type SidebarTab = 'channels' | 'sports';
@@ -60,6 +63,7 @@ function ChannelRow({
         <p className="text-xs font-semibold text-[#f1f1f4] truncate">{channel.name}</p>
         <p className="text-[10px] text-[#6b7280] truncate">{channel.category} · {channel.country}</p>
       </div>
+      <FavoriteChannelButton channel={channel} size={12} className="w-7 h-7 shrink-0" />
       {channel.isLive && <span className="live-dot shrink-0" />}
     </button>
   );
@@ -117,6 +121,8 @@ export default function LivePlayerSidebar({
   const [category, setCategory] = useState('');
   const [country, setCountry] = useState('');
   const [sort, setSort] = useState<'az' | 'category'>('category');
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const { favoriteChannels } = useApp();
 
   const { now, currentEvents, worldCupUpcoming, majorEvents } = useSportsEvents();
   const upcomingMajor = useMemo(
@@ -133,14 +139,22 @@ export default function LivePlayerSidebar({
     [channels],
   );
 
+  const favoriteList = useMemo(
+    () => resolveFavoriteChannels(favoriteChannels, channels),
+    [favoriteChannels, channels],
+  );
+  const favoriteIds = useMemo(() => new Set(favoriteList.map(c => c.id)), [favoriteList]);
+
   const filteredChannels = useMemo(() => {
-    let list = filterChannelsByQuery(channels, search);
+    let list = favoritesOnly
+      ? favoriteList
+      : filterChannelsByQuery(channels, search);
     if (category) list = list.filter(c => c.category === category);
     if (country) list = list.filter(c => c.country === country);
     if (sort === 'az') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
     else list = [...list].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
     return list;
-  }, [channels, search, category, country, sort]);
+  }, [channels, favoriteList, favoritesOnly, search, category, country, sort]);
 
   return (
     <aside className={`w-full lg:w-[340px] shrink-0 flex flex-col bg-[#0a0a0f] lg:border-l border-[rgba(139,92,246,0.1)] ${className}`}>
@@ -191,6 +205,18 @@ export default function LivePlayerSidebar({
               />
             </div>
             <div className="flex gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setFavoritesOnly(v => !v)}
+                className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${
+                  favoritesOnly
+                    ? 'bg-[rgba(245,158,11,0.15)] border-[rgba(245,158,11,0.35)] text-[#f59e0b]'
+                    : 'bg-[#14141f] border-[rgba(139,92,246,0.12)] text-[#9ca3af] hover:text-[#f1f1f4]'
+                }`}
+              >
+                <Star size={10} fill={favoritesOnly ? 'currentColor' : 'none'} />
+                Favorites{favoriteIds.size > 0 ? ` (${favoriteIds.size})` : ''}
+              </button>
               <select
                 value={category}
                 onChange={e => setCategory(e.target.value)}
@@ -220,17 +246,23 @@ export default function LivePlayerSidebar({
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {filteredChannels.map(channel => (
-              <ChannelRow
-                key={channel.id}
-                channel={channel}
-                isActive={channel.id === selectedChannelId}
-                onSelect={() => {
-                  onSelectChannel(channel);
-                  onNavigate?.();
-                }}
-              />
-            ))}
+            {filteredChannels.length === 0 ? (
+              <p className="text-center text-xs text-[#6b7280] py-8 px-3">
+                {favoritesOnly ? 'No favorite channels yet. Star a channel to save it.' : 'No channels match your filters.'}
+              </p>
+            ) : (
+              filteredChannels.map(channel => (
+                <ChannelRow
+                  key={channel.id}
+                  channel={channel}
+                  isActive={channel.id === selectedChannelId}
+                  onSelect={() => {
+                    onSelectChannel(channel);
+                    onNavigate?.();
+                  }}
+                />
+              ))
+            )}
           </div>
         </>
       ) : (

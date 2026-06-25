@@ -23,7 +23,11 @@ declare global {
       isSupported: () => boolean;
       Events: { MANIFEST_PARSED: string; ERROR: string };
       ErrorTypes: { NETWORK_ERROR: string; MEDIA_ERROR: string };
-      new (config?: { enableWorker?: boolean; lowLatencyMode?: boolean }): HlsInstance;
+      new (config?: {
+        enableWorker?: boolean;
+        lowLatencyMode?: boolean;
+        xhrSetup?: (xhr: XMLHttpRequest) => void;
+      }): HlsInstance;
     };
   }
 }

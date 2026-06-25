@@ -67,6 +67,16 @@ export interface Channel {
   altPaths?: string[];
 }
 
+export interface FavoriteChannel {
+  id: string;
+  name: string;
+  logo: string;
+  category: string;
+  country: string;
+  streamUrl?: string;
+  addedAt: number;
+}
+
 export type StreamingSource = 'vidsrcto' | 'vidking' | 'vidsync' | 'rivestream' | 'rivestreamAgg' | 'rivestreamTorrent' | 'vidsrcme';
 
 export interface SourceConfig {

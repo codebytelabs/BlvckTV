@@ -1,4 +1,4 @@
-import type { WatchItem, HistoryItem, ContinueWatchingItem } from '@/types';
+import type { WatchItem, HistoryItem, ContinueWatchingItem, Channel, FavoriteChannel } from '@/types';
 import { DEFAULT_SOURCE_PRIORITY } from '@/lib/streamingSources';
 
 const KEYS = {
@@ -6,6 +6,7 @@ const KEYS = {
   HISTORY: 'blvcktv_history',
   CONTINUE_WATCHING: 'blvcktv_continue',
   SETTINGS: 'blvcktv_settings',
+  FAVORITE_CHANNELS: 'blvcktv_favorite_channels',
 };
 
 const LEGACY_KEYS: Record<keyof typeof KEYS, string> = {
@@ -13,6 +14,7 @@ const LEGACY_KEYS: Record<keyof typeof KEYS, string> = {
   HISTORY: 'streamhub_history',
   CONTINUE_WATCHING: 'streamhub_continue',
   SETTINGS: 'streamhub_settings',
+  FAVORITE_CHANNELS: 'streamhub_favorite_channels',
 };
 
 function migrateLegacyStorage(): void {
@@ -50,6 +52,68 @@ export function removeFromWatchlist(id: number, type: 'movie' | 'tv'): void {
 
 export function isInWatchlist(id: number, type: 'movie' | 'tv'): boolean {
   return getWatchlist().some(i => i.id === id && i.type === type);
+}
+
+export function channelToFavorite(channel: Pick<Channel, 'id' | 'name' | 'logo' | 'category' | 'country' | 'streamUrl'>): FavoriteChannel {
+  return {
+    id: channel.id,
+    name: channel.name,
+    logo: channel.logo,
+    category: channel.category,
+    country: channel.country,
+    streamUrl: channel.streamUrl,
+    addedAt: Date.now(),
+  };
+}
+
+export function getFavoriteChannels(): FavoriteChannel[] {
+  try {
+    return JSON.parse(localStorage.getItem(KEYS.FAVORITE_CHANNELS) || '[]') as FavoriteChannel[];
+  } catch {
+    return [];
+  }
+}
+
+export function addFavoriteChannel(channel: FavoriteChannel): void {
+  const list = getFavoriteChannels();
+  if (list.some(c => c.id === channel.id)) return;
+  list.unshift(channel);
+  localStorage.setItem(KEYS.FAVORITE_CHANNELS, JSON.stringify(list));
+}
+
+export function removeFavoriteChannel(id: string): void {
+  const list = getFavoriteChannels().filter(c => c.id !== id);
+  localStorage.setItem(KEYS.FAVORITE_CHANNELS, JSON.stringify(list));
+}
+
+export function isFavoriteChannel(id: string): boolean {
+  return getFavoriteChannels().some(c => c.id === id);
+}
+
+export function toggleFavoriteChannel(channel: FavoriteChannel): boolean {
+  if (isFavoriteChannel(channel.id)) {
+    removeFavoriteChannel(channel.id);
+    return false;
+  }
+  addFavoriteChannel(channel);
+  return true;
+}
+
+/** Merge stored favorites with latest catalog metadata when available. */
+export function resolveFavoriteChannels(favorites: FavoriteChannel[], catalog: Channel[]): Channel[] {
+  return favorites.map(fav => {
+    const latest = catalog.find(c => c.id === fav.id);
+    if (latest) return latest;
+    return {
+      id: fav.id,
+      name: fav.name,
+      logo: fav.logo,
+      category: fav.category,
+      country: fav.country,
+      streamUrl: fav.streamUrl,
+      isLive: true,
+    };
+  });
 }
 
 export function getHistory(): HistoryItem[] {
