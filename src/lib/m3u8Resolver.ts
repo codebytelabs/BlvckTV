@@ -12,7 +12,9 @@ export async function resolveM3u8Url(channelId: string): Promise<string | null> 
         });
         if (res.ok) {
           const data = (await res.json()) as { url?: string };
-          if (data.url) return data.url;
+          if (data.url) {
+            return `/api/dlhd/playlist?id=${encodeURIComponent(id)}`;
+          }
         }
       } catch {
         // fall through

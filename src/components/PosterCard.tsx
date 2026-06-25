@@ -8,9 +8,11 @@ interface PosterCardProps {
   type: 'movie' | 'tv';
   progress?: number;
   compact?: boolean;
+  resumeSeason?: number;
+  resumeEpisode?: number;
 }
 
-export default function PosterCard({ item, type, progress, compact }: PosterCardProps) {
+export default function PosterCard({ item, type, progress, compact, resumeSeason, resumeEpisode }: PosterCardProps) {
   const { isWatchlisted, toggleWatchlist, setSelectedDetail, setSelectedVideo, addHistory } = useApp();
   const title = type === 'movie' ? (item as Movie).title : (item as TVShow).name;
   const year = type === 'movie'
@@ -19,8 +21,23 @@ export default function PosterCard({ item, type, progress, compact }: PosterCard
   const watchlisted = isWatchlisted(item.id, type);
 
   const handlePlay = () => {
-    setSelectedVideo({ tmdbId: item.id, type, title });
-    addHistory({ id: item.id, type, title, poster_path: item.poster_path, watchedAt: Date.now() });
+    setSelectedVideo({
+      tmdbId: item.id,
+      type,
+      title,
+      poster_path: item.poster_path,
+      season: resumeSeason,
+      episode: resumeEpisode,
+    });
+    addHistory({
+      id: item.id,
+      type,
+      title,
+      poster_path: item.poster_path,
+      watchedAt: Date.now(),
+      season: resumeSeason,
+      episode: resumeEpisode,
+    });
   };
 
   const handleDetail = () => {

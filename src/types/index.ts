@@ -115,6 +115,7 @@ export type SelectedVideo = {
   episode?: number;
   title: string;
   imdbId?: string | null;
+  poster_path?: string | null;
 };
 
 export type MovieCatalogMode = 'popular' | 'trending' | 'top_rated' | 'now_playing' | 'upcoming';

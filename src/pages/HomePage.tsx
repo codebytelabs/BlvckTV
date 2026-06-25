@@ -1,27 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '@/context/AppContext';
 import { useTMDB } from '@/hooks/useTMDB';
-import { getContinueWatching } from '@/lib/storage';
 import HeroBanner from '@/components/HeroBanner';
 import Carousel from '@/components/Carousel';
 import PosterCard from '@/components/PosterCard';
 import TMDBErrorState from '@/components/TMDBErrorState';
 import ChannelCard from '@/components/ChannelCard';
 import { useChannels } from '@/hooks/useChannels';
-import type { Movie, TVShow, ContinueWatchingItem } from '@/types';
+import type { Movie, TVShow } from '@/types';
 
 const GENRE_PILLS = ['Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 'Romance', 'Documentary', 'Animation'];
 
 export default function HomePage() {
-  const { setCurrentPage } = useApp();
+  const { setCurrentPage, continueWatching, refreshContinueWatching } = useApp();
   const { fetchTrendingMovies, fetchTrendingTV, fetchPopularMovies, error } = useTMDB();
   const { liveChannels } = useChannels();
   const [trendingMovies, setTrendingMovies] = useState<Movie[]>([]);
   const [trendingTV, setTrendingTV] = useState<TVShow[]>([]);
   const [popularMovies, setPopularMovies] = useState<Movie[]>([]);
-  const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
   const [retryCount, setRetryCount] = useState(0);
   const [initialLoading, setInitialLoading] = useState(true);
+
+  useEffect(() => {
+    refreshContinueWatching();
+  }, [refreshContinueWatching]);
 
   useEffect(() => {
     const load = async () => {
@@ -34,7 +36,6 @@ export default function HomePage() {
       if (tm) setTrendingMovies(tm);
       if (tv) setTrendingTV(tv);
       if (pm) setPopularMovies(pm);
-      setContinueWatching(getContinueWatching());
       setInitialLoading(false);
     };
     load();
@@ -76,6 +77,8 @@ export default function HomePage() {
                     item={{ id: cw.id, title: cw.title, name: cw.title, poster_path: cw.poster_path, overview: '', backdrop_path: null, genre_ids: [], vote_average: 0, release_date: '', first_air_date: '' } as Movie & TVShow}
                     type={cw.type}
                     progress={cw.progress}
+                    resumeSeason={cw.season}
+                    resumeEpisode={cw.episode}
                   />
                 </div>
               ))}

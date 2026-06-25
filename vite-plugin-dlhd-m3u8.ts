@@ -19,6 +19,103 @@ const VALID_PATHS = new Set(['watch', 'player', 'plus', 'casting', 'cast', 'stre
 
 const POPUP_BLOCK_SCRIPT = `<script>(function(){var o=window.open;window.open=function(){return null};})();</script>`;
 
+const HLS_FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+  Referer: 'https://dlhd.pk/',
+  Accept: '*/*',
+};
+
+function rewriteManifest(body: string, baseUrl: string): string {
+  const base = baseUrl.endsWith('/') ? baseUrl : `${baseUrl.substring(0, baseUrl.lastIndexOf('/') + 1)}`;
+  return body
+    .split('\n')
+    .map(line => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return line;
+      const absolute = trimmed.startsWith('http') ? trimmed : new URL(trimmed, base).href;
+      return `/api/dlhd/segment?url=${encodeURIComponent(absolute)}`;
+    })
+    .join('\n');
+}
+
+async function fetchStreamResource(targetUrl: string): Promise<Response | null> {
+  try {
+    return await fetch(targetUrl, { headers: HLS_FETCH_HEADERS });
+  } catch {
+    return null;
+  }
+}
+
+async function serveProxiedPlaylist(channelId: string, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b?: string) => void }): Promise<void> {
+  const streamUrl = await resolveM3u8(channelId);
+  if (!streamUrl) {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'text/plain');
+    res.end('No stream found');
+    return;
+  }
+
+  const upstream = await fetchStreamResource(streamUrl);
+  if (!upstream?.ok) {
+    res.statusCode = 502;
+    res.setHeader('Content-Type', 'text/plain');
+    res.end('Upstream playlist error');
+    return;
+  }
+
+  const text = await upstream.text();
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(rewriteManifest(text, streamUrl));
+}
+
+async function serveProxiedSegment(targetUrl: string, res: { statusCode: number; setHeader: (k: string, v: string) => void; end: (b?: Buffer | string) => void }): Promise<void> {
+  const upstream = await fetchStreamResource(targetUrl);
+  if (!upstream?.ok) {
+    res.statusCode = 502;
+    res.end();
+    return;
+  }
+
+  const contentType = upstream.headers.get('content-type') ?? '';
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  const isPlaylist =
+    targetUrl.includes('.m3u8') ||
+    contentType.includes('mpegurl') ||
+    contentType.includes('m3u8');
+
+  res.statusCode = 200;
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-store');
+
+  if (isPlaylist) {
+    res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+    res.end(rewriteManifest(buffer.toString('utf8'), targetUrl));
+    return;
+  }
+
+  res.setHeader('Content-Type', contentType || 'application/octet-stream');
+  res.end(buffer);
+}
+
+function injectFreshM3u8IntoClappr(html: string, playlistPath: string): string {
+  const encoded = Buffer.from(playlistPath).toString('base64');
+  if (/atob\s*\(\s*['"][^'"]+['"]\s*\)/.test(html)) {
+    return html.replace(/atob\s*\(\s*['"][^'"]+['"]\s*\)/, `atob('${encoded}')`);
+  }
+  return html;
+}
+
+function isPlayablePlayerHtml(html: string): boolean {
+  return (
+    /<iframe[^>]+src=["']https?:\/\//i.test(html) ||
+    /new Clappr\.Player/i.test(html) ||
+    /Hls\.isSupported/i.test(html)
+  );
+}
+
 function parseM3u8FromHtml(html: string): string | null {
   const atobMatch = html.match(ATOB_RE);
   if (atobMatch) {
@@ -73,20 +170,18 @@ ${POPUP_BLOCK_SCRIPT}
 <script>
 (async function(){
   try {
-    var res = await fetch('/api/dlhd/m3u8?id=${id}', { cache: 'no-store' });
-    var data = await res.json();
-    if (!data.url) throw new Error('no stream');
+    var playlistUrl = '/api/dlhd/playlist?id=${id}';
     var v = document.getElementById('v');
     if (window.Hls && Hls.isSupported()) {
       var hls = new Hls({ lowLatencyMode: true, enableWorker: true });
-      hls.loadSource(data.url);
+      hls.loadSource(playlistUrl);
       hls.attachMedia(v);
       hls.on(Hls.Events.MANIFEST_PARSED, function(){ v.play().catch(function(){}); });
       hls.on(Hls.Events.ERROR, function(ev, d){
         if (d.fatal) document.body.innerHTML='<p style="color:#aaa;text-align:center;padding:2rem">Stream unavailable</p>';
       });
     } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
-      v.src = data.url;
+      v.src = playlistUrl;
       v.play().catch(function(){});
     } else {
       throw new Error('no hls support');
@@ -103,14 +198,23 @@ function isDlhdIframeWrapper(html: string): boolean {
 }
 
 /**
- * Path-specific DLHD wrapper when the mirror serves an iframe embed.
- * When dlhd.pk is down, use buildHlsFramePlayer so m3u8 is fetched fresh
- * (daddy3 Clappr pages embed signed URLs that expire immediately).
+ * Path-specific DLHD wrapper when available.
+ * Otherwise Clappr (daddy3) with same-origin proxied playlist, then inline HLS player.
  */
 async function fetchStreamPageHtml(path: string, id: string): Promise<string | null> {
   const wrapperHtml = await fetchHtml(getDlhdWrapperUrl(path, id));
   if (wrapperHtml && isDlhdIframeWrapper(wrapperHtml)) {
     return wrapperHtml;
+  }
+
+  const playlistPath = `/api/dlhd/playlist?id=${encodeURIComponent(id)}`;
+  const playerHtml = await fetchHtml(getDirectPlayerUrl(id));
+  if (playerHtml && /Clappr\.Player/i.test(playerHtml)) {
+    return injectFreshM3u8IntoClappr(playerHtml, playlistPath);
+  }
+
+  if (playerHtml && isPlayablePlayerHtml(playerHtml)) {
+    return playerHtml;
   }
 
   return buildHlsFramePlayer(id);
@@ -162,6 +266,28 @@ export function dlhdM3u8Plugin(): Plugin {
         if (!req.url?.startsWith('/api/dlhd/')) return next();
 
         const url = new URL(req.url, 'http://localhost');
+
+        if (req.url.startsWith('/api/dlhd/playlist')) {
+          const id = url.searchParams.get('id')?.replace(/\D/g, '');
+          if (!id) {
+            res.statusCode = 400;
+            res.end('Bad request');
+            return;
+          }
+          await serveProxiedPlaylist(id, res);
+          return;
+        }
+
+        if (req.url.startsWith('/api/dlhd/segment')) {
+          const target = url.searchParams.get('url');
+          if (!target?.startsWith('http')) {
+            res.statusCode = 400;
+            res.end('Bad request');
+            return;
+          }
+          await serveProxiedSegment(target, res);
+          return;
+        }
 
         if (req.url.startsWith('/api/dlhd/embed-inner')) {
           const path = url.searchParams.get('path') || 'watch';

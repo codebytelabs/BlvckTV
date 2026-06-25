@@ -73,7 +73,12 @@ export default function HeroBanner({ movies }: HeroBannerProps) {
 
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <button
-            onClick={() => setSelectedVideo({ tmdbId: slide.id, type: 'movie', title: slide.title })}
+            onClick={() => setSelectedVideo({
+              tmdbId: slide.id,
+              type: 'movie',
+              title: slide.title,
+              poster_path: slide.poster_path,
+            })}
             className="touch-target btn-primary flex items-center gap-2 text-sm min-h-[44px] px-5"
           >
             <Play size={16} /> Play

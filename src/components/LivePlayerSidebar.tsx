@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useChannelLogo } from '@/hooks/useChannelLogo';
+import { useSportsEvents } from '@/hooks/useSportsEvents';
 import {
-  getLiveEvents,
-  getMajorUpcoming,
-  getWorldCupUpcoming,
   formatEventTime,
   timeUntilEvent,
   type SportsEvent,
@@ -70,9 +68,11 @@ function ChannelRow({
 function SportRow({
   event,
   onSelect,
+  now,
 }: {
   event: SportsEvent;
   onSelect: () => void;
+  now: number;
 }) {
   return (
     <button
@@ -88,7 +88,7 @@ function SportRow({
             <span className="live-dot" /> LIVE
           </span>
         ) : (
-          <span className="text-[10px] text-[#6b7280] shrink-0">{timeUntilEvent(event.startTime)}</span>
+          <span className="text-[10px] text-[#6b7280] shrink-0">{timeUntilEvent(event.startTime, now)}</span>
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
@@ -118,10 +118,10 @@ export default function LivePlayerSidebar({
   const [country, setCountry] = useState('');
   const [sort, setSort] = useState<'az' | 'category'>('category');
 
-  const liveEvents = useMemo(() => getLiveEvents(), []);
+  const { now, currentEvents, worldCupUpcoming, majorEvents } = useSportsEvents();
   const upcomingMajor = useMemo(
-    () => [...getWorldCupUpcoming(), ...getMajorUpcoming()].slice(0, 8),
-    [],
+    () => [...worldCupUpcoming, ...majorEvents].slice(0, 8),
+    [worldCupUpcoming, majorEvents],
   );
 
   const categories = useMemo(
@@ -145,15 +145,15 @@ export default function LivePlayerSidebar({
   return (
     <aside className={`w-full lg:w-[340px] shrink-0 flex flex-col bg-[#0a0a0f] lg:border-l border-[rgba(139,92,246,0.1)] ${className}`}>
       {/* Live now banner */}
-      {liveEvents.length > 0 && (
+      {currentEvents.length > 0 && (
         <div className="p-3 border-b border-[rgba(139,92,246,0.1)]">
           <div className="flex items-center gap-2 mb-2">
             <Radio size={14} className="text-[#ef4444]" />
             <span className="text-xs font-bold text-[#f1f1f4] uppercase tracking-wide">Live Now</span>
           </div>
           <div className="space-y-1">
-            {liveEvents.map(event => (
-              <SportRow key={event.id} event={event} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
+            {currentEvents.map(event => (
+              <SportRow key={event.id} event={event} now={now} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
             ))}
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function LivePlayerSidebar({
             </div>
             <div className="space-y-1">
               {upcomingMajor.map(event => (
-                <SportRow key={event.id} event={event} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
+                <SportRow key={event.id} event={event} now={now} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
               ))}
             </div>
           </div>

@@ -85,20 +85,9 @@ export function updateContinueWatching(item: ContinueWatchingItem): void {
   const list = getContinueWatching();
   const existing = list.findIndex(i => i.id === item.id && i.type === item.type);
   if (existing !== -1) {
-    if (item.type === 'tv' && item.season && item.episode) {
-      const existingTV = list[existing];
-      if (existingTV.season === item.season && existingTV.episode === item.episode) {
-        list[existing] = item;
-      } else {
-        list.splice(existing, 1);
-        list.unshift(item);
-      }
-    } else {
-      list[existing] = item;
-    }
-  } else {
-    list.unshift(item);
+    list.splice(existing, 1);
   }
+  list.unshift(item);
   if (list.length > 100) list.length = 100;
   localStorage.setItem(KEYS.CONTINUE_WATCHING, JSON.stringify(list));
 }

@@ -25,10 +25,77 @@ export interface SportsEvent {
   channelId?: string;
   /** Display name for the stream player */
   channelName?: string;
-  /** Only true for matches actively in progress */
+  /** Derived at runtime from startTime — do not rely on static values in data */
   isLive: boolean;
   isMajor?: boolean;
   liveMinute?: string;
+}
+
+export type EventStatus = 'live' | 'soon' | 'upcoming' | 'past';
+
+const EVENT_DURATION_MS: Partial<Record<SportsLeague, number>> = {
+  'World Cup': 2.25 * 60 * 60 * 1000,
+  'WC Qualifiers': 2.25 * 60 * 60 * 1000,
+  Euro: 2.25 * 60 * 60 * 1000,
+  EPL: 2.25 * 60 * 60 * 1000,
+  UCL: 2.25 * 60 * 60 * 1000,
+  Olympics: 2.25 * 60 * 60 * 1000,
+  NBA: 2.75 * 60 * 60 * 1000,
+  NHL: 3 * 60 * 60 * 1000,
+  NFL: 3.5 * 60 * 60 * 1000,
+  Tennis: 4 * 60 * 60 * 1000,
+  UFC: 4 * 60 * 60 * 1000,
+  F1: 3 * 60 * 60 * 1000,
+  'Cricket WC': 5 * 60 * 60 * 1000,
+};
+
+const DEFAULT_EVENT_DURATION_MS = 3 * 60 * 60 * 1000;
+const STARTING_SOON_MS = 90 * 60 * 1000;
+
+function getEventDurationMs(league: SportsLeague): number {
+  return EVENT_DURATION_MS[league] ?? DEFAULT_EVENT_DURATION_MS;
+}
+
+export function resolveEventStatus(event: SportsEvent, now = Date.now()): EventStatus {
+  const start = new Date(event.startTime).getTime();
+  const end = start + getEventDurationMs(event.league);
+
+  if (now >= start && now < end) return 'live';
+  if (now < start && start - now <= STARTING_SOON_MS) return 'soon';
+  if (now < start) return 'upcoming';
+  return 'past';
+}
+
+function computeLiveMinute(startTime: string, league: SportsLeague): string {
+  const elapsedMin = Math.floor((Date.now() - new Date(startTime).getTime()) / 60000);
+  const isFootball = ['World Cup', 'WC Qualifiers', 'Euro', 'EPL', 'UCL', 'Olympics'].includes(league);
+
+  if (isFootball) {
+    if (elapsedMin >= 105) return 'FT';
+    if (elapsedMin > 45 && elapsedMin <= 60) return 'HT';
+    return `${Math.min(elapsedMin, 90)}'`;
+  }
+
+  return `${elapsedMin}'`;
+}
+
+/** Attach live / soon state from wall-clock time (ignores stale static flags). */
+export function enrichSportsEvent(event: SportsEvent, now = Date.now()): SportsEvent {
+  const status = resolveEventStatus(event, now);
+  return {
+    ...event,
+    isLive: status === 'live',
+    liveMinute: status === 'live' ? computeLiveMinute(event.startTime, event.league) : undefined,
+  };
+}
+
+function enrichAll(now = Date.now()): SportsEvent[] {
+  return SPORTS_EVENTS.map(event => enrichSportsEvent(event, now));
+}
+
+function isUpcoming(event: SportsEvent, now = Date.now()): boolean {
+  const status = resolveEventStatus(event, now);
+  return status === 'upcoming' || status === 'soon';
 }
 
 export const SPORTS_EVENTS: SportsEvent[] = [
@@ -343,26 +410,75 @@ export const SPORTS_EVENTS: SportsEvent[] = [
   },
 ];
 
-export function getLiveEvents(): SportsEvent[] {
-  return SPORTS_EVENTS.filter(e => e.isLive);
-}
-
-export function getWorldCupUpcoming(): SportsEvent[] {
-  return SPORTS_EVENTS
-    .filter(e => e.league === 'World Cup' && !e.isLive)
+export function getLiveEvents(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => resolveEventStatus(e, now) === 'live')
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 }
 
-export function getMajorUpcoming(): SportsEvent[] {
-  return SPORTS_EVENTS
-    .filter(e => e.isMajor && !e.isLive && e.league !== 'World Cup')
+export function getStartingSoonEvents(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => resolveEventStatus(e, now) === 'soon')
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 }
 
-export function getScheduleEvents(): SportsEvent[] {
-  return SPORTS_EVENTS
-    .filter(e => !e.isLive && !e.isMajor)
+/** Live + starting within 90 minutes — shown in "Live Now" */
+export function getCurrentEvents(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => {
+      const status = resolveEventStatus(e, now);
+      return status === 'live' || status === 'soon';
+    })
     .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function getWorldCupUpcoming(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => e.league === 'World Cup' && isUpcoming(e, now))
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function getMajorUpcoming(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => e.isMajor && e.league !== 'World Cup' && isUpcoming(e, now))
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function getScheduleEvents(now = Date.now()): SportsEvent[] {
+  return enrichAll(now)
+    .filter(e => !e.isMajor && isUpcoming(e, now))
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function getEventsForDayOffset(dayOffset: number, now = Date.now()): SportsEvent[] {
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  dayStart.setDate(dayStart.getDate() + dayOffset);
+
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  return enrichAll(now)
+    .filter(e => {
+      if (resolveEventStatus(e, now) === 'past') return false;
+      const t = new Date(e.startTime).getTime();
+      return t >= dayStart.getTime() && t < dayEnd.getTime();
+    })
+    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+}
+
+export function buildDateTabs(now = Date.now()): Array<{ label: string; offset: number }> {
+  return Array.from({ length: 7 }, (_, offset) => {
+    const d = new Date(now);
+    d.setDate(d.getDate() + offset);
+    const label =
+      offset === 0
+        ? 'Today'
+        : offset === 1
+          ? 'Tomorrow'
+          : d.toLocaleDateString('en-US', { weekday: 'short' });
+    return { label, offset };
+  });
 }
 
 export function formatEventTime(iso: string): string {
@@ -373,10 +489,16 @@ export function formatEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function timeUntilEvent(iso: string): string {
-  const diff = new Date(iso).getTime() - Date.now();
-  const hours = Math.floor(diff / 3600000);
-  if (hours < 1) return 'Soon';
+export function timeUntilEvent(iso: string, now = Date.now()): string {
+  const diff = new Date(iso).getTime() - now;
+  if (diff <= 0) return 'Started';
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
+}
+
+export function isEventStartingSoon(event: SportsEvent, now = Date.now()): boolean {
+  return resolveEventStatus(event, now) === 'soon';
 }

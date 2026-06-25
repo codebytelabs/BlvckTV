@@ -1,22 +1,18 @@
-import { useMemo, useState, useCallback, type KeyboardEvent } from 'react';
+import { useState, useCallback, type KeyboardEvent } from 'react';
 import ChannelCard from '@/components/ChannelCard';
 import { useApp } from '@/context/AppContext';
 import { useChannels } from '@/hooks/useChannels';
+import { useSportsEvents } from '@/hooks/useSportsEvents';
 import {
-  getLiveEvents,
-  getMajorUpcoming,
-  getScheduleEvents,
-  getWorldCupUpcoming,
   formatEventDate,
   formatEventTime,
   timeUntilEvent,
+  isEventStartingSoon,
   type SportsEvent,
 } from '@/lib/sportsEvents';
 import { resolveSportsChannel } from '@/lib/sportsChannelResolver';
 import { useWatchChannel } from '@/hooks/useWatchChannel';
 import { Bell, Calendar, Clock, Globe, Play, Radio, Trophy } from 'lucide-react';
-
-const DATE_TABS = ['Today', 'Tomorrow', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue'];
 
 function useWatchEvent() {
   const { showToast } = useApp();
@@ -83,7 +79,16 @@ function WatchButton({
   );
 }
 
-function LiveBadge({ minute }: { minute?: string }) {
+function LiveBadge({ minute, startingSoon }: { minute?: string; startingSoon?: boolean }) {
+  if (startingSoon) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#f59e0b]">
+        <Clock size={10} />
+        Starting soon
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-[#ef4444]">
       <span className="live-dot" />
@@ -107,10 +112,11 @@ function LeagueBadge({ league }: { league: SportsEvent['league'] }) {
   );
 }
 
-function LiveMatchCard({ event }: { event: SportsEvent }) {
+function LiveMatchCard({ event, now }: { event: SportsEvent; now: number }) {
   const watchEvent = useWatchEvent();
   const { channels } = useChannels();
   const canWatch = useCanWatchEvent(event, channels);
+  const startingSoon = isEventStartingSoon(event, now);
 
   const handleClick = () => {
     if (canWatch) watchEvent(event);
@@ -129,18 +135,19 @@ function LiveMatchCard({ event }: { event: SportsEvent }) {
       tabIndex={canWatch ? 0 : undefined}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className={`relative p-5 rounded-2xl overflow-hidden border-2 border-[rgba(239,68,68,0.45)] transition-colors hover:border-[rgba(239,68,68,0.65)] ${
+      className={`relative p-5 rounded-2xl overflow-hidden border-2 transition-colors hover:border-[rgba(239,68,68,0.65)] ${
         canWatch ? 'cursor-pointer' : ''
-      }`}
+      } ${startingSoon ? 'border-[rgba(245,158,11,0.45)]' : 'border-[rgba(239,68,68,0.45)]'}`}
       style={{
-        background:
-          'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(20,20,31,0.95) 45%, rgba(30,30,45,0.9) 100%)',
+        background: startingSoon
+          ? 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(20,20,31,0.95) 45%, rgba(30,30,45,0.9) 100%)'
+          : 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(20,20,31,0.95) 45%, rgba(30,30,45,0.9) 100%)',
       }}
     >
       <div className="absolute top-0 right-0 w-32 h-32 bg-[rgba(239,68,68,0.06)] rounded-full -translate-y-10 translate-x-10" />
       <div className="flex items-center justify-between gap-2 mb-3">
         <LeagueBadge league={event.league} />
-        <LiveBadge minute={event.liveMinute} />
+        <LiveBadge minute={event.liveMinute} startingSoon={startingSoon} />
       </div>
       <h3 className="text-lg font-extrabold text-[#f1f1f4]">{event.name}</h3>
       <p className="text-xs text-[#9ca3af] mt-1">{event.teams}</p>
@@ -152,15 +159,21 @@ function LiveMatchCard({ event }: { event: SportsEvent }) {
           {event.channelName ?? event.channel}
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-[#6b7280]">Started {formatEventTime(event.startTime)}</span>
-          {canWatch && <WatchButton event={event} label="Watch Live" variant="live" />}
+          <span className="text-[10px] text-[#6b7280]">
+            {startingSoon
+              ? `Starts ${formatEventTime(event.startTime)} · ${timeUntilEvent(event.startTime, now)}`
+              : `Started ${formatEventTime(event.startTime)}`}
+          </span>
+          {canWatch && (
+            <WatchButton event={event} label={startingSoon ? 'Watch' : 'Watch Live'} variant="live" />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function UpcomingEventRow({ event }: { event: SportsEvent }) {
+function UpcomingEventRow({ event, now }: { event: SportsEvent; now: number }) {
   const { channels } = useChannels();
   const canWatch = useCanWatchEvent(event, channels);
 
@@ -186,7 +199,7 @@ function UpcomingEventRow({ event }: { event: SportsEvent }) {
       </div>
       <div className="text-right shrink-0">
         <p className="text-xs font-semibold text-[#f1f1f4]">{formatEventTime(event.startTime)}</p>
-        <p className="text-[10px] text-[#06b6d4]">{timeUntilEvent(event.startTime)}</p>
+        <p className="text-[10px] text-[#06b6d4]">{timeUntilEvent(event.startTime, now)}</p>
         <span className="text-[10px] text-[#6b7280] mt-1 block">{event.channelName ?? event.channel}</span>
       </div>
       {canWatch ? (
@@ -242,11 +255,17 @@ function MajorEventCard({ event }: { event: SportsEvent }) {
 export default function SportsPage() {
   const [activeTab, setActiveTab] = useState(0);
   const { sportsChannels } = useChannels();
+  const {
+    now,
+    liveEvents,
+    currentEvents,
+    worldCupUpcoming,
+    majorEvents,
+    dateTabs,
+    eventsForDay,
+  } = useSportsEvents();
 
-  const liveEvents = useMemo(() => getLiveEvents(), []);
-  const worldCupUpcoming = useMemo(() => getWorldCupUpcoming(), []);
-  const scheduleEvents = useMemo(() => getScheduleEvents(), []);
-  const majorEvents = useMemo(() => getMajorUpcoming(), []);
+  const dayEvents = eventsForDay(activeTab);
 
   return (
     <div className="space-y-10 pb-10">
@@ -256,24 +275,33 @@ export default function SportsPage() {
         <h1 className="text-2xl font-extrabold text-[#f1f1f4]">Sports</h1>
       </div>
 
-      {/* Live Now — only actually-live matches */}
+      {/* Live Now — in progress + starting within 90 min */}
       <section id="live-now">
         <div className="flex items-center gap-2 mb-4">
           <Radio size={18} className="text-[#ef4444]" />
           <h2 className="text-lg font-bold text-[#f1f1f4]">Live Now</h2>
-          <span className="live-dot" />
+          {liveEvents.length > 0 && <span className="live-dot" />}
           <span className="text-xs font-semibold text-[#9ca3af]">
-            {liveEvents.length} {liveEvents.length === 1 ? 'match' : 'matches'}
+            {currentEvents.length === 0
+              ? 'No matches right now'
+              : `${liveEvents.length} live${currentEvents.length > liveEvents.length ? ` · ${currentEvents.length - liveEvents.length} starting soon` : ''}`}
           </span>
         </div>
-        <div
-          className="grid gap-4"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}
-        >
-          {liveEvents.map(event => (
-            <LiveMatchCard key={event.id} event={event} />
-          ))}
-        </div>
+        {currentEvents.length === 0 ? (
+          <div className="rounded-xl border border-[rgba(139,92,246,0.12)] bg-[#14141f] px-4 py-8 text-center">
+            <p className="text-sm text-[#9ca3af]">Nothing live at the moment.</p>
+            <p className="text-xs text-[#6b7280] mt-1">Check upcoming fixtures below or browse Sports Channels.</p>
+          </div>
+        ) : (
+          <div
+            className="grid gap-4"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}
+          >
+            {currentEvents.map(event => (
+              <LiveMatchCard key={event.id} event={event} now={now} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* World Cup 2026 — banner + upcoming only (no live mixed in) */}
@@ -343,13 +371,13 @@ export default function SportsPage() {
         </div>
       </section>
 
-      {/* Schedule — regular upcoming (excludes live, WC spotlight, major cards) */}
+      {/* Schedule — filtered by selected day */}
       <section>
         <h2 className="text-sm font-bold text-[#f1f1f4] mb-3 uppercase tracking-wider">Schedule</h2>
         <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
-          {DATE_TABS.map((tab, i) => (
+          {dateTabs.map((tab, i) => (
             <button
-              key={tab}
+              key={tab.offset}
               type="button"
               onClick={() => setActiveTab(i)}
               className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200 shrink-0 ${
@@ -359,18 +387,24 @@ export default function SportsPage() {
               }`}
               style={activeTab === i ? { background: 'linear-gradient(135deg, #8b5cf6, #06b6d4)' } : {}}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
-        >
-          {scheduleEvents.map(event => (
-            <UpcomingEventRow key={event.id} event={event} />
-          ))}
-        </div>
+        {dayEvents.length === 0 ? (
+          <div className="rounded-xl border border-[rgba(139,92,246,0.12)] bg-[#14141f] px-4 py-6 text-center text-sm text-[#6b7280]">
+            No events scheduled for {dateTabs[activeTab]?.label ?? 'this day'}.
+          </div>
+        ) : (
+          <div
+            className="grid gap-3"
+            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}
+          >
+            {dayEvents.map(event => (
+              <UpcomingEventRow key={event.id} event={event} now={now} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Sports channels */}
