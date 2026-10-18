@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { AppProvider, useApp } from '@/context/AppContext';
+import { LiveCatalogProvider } from '@/context/LiveCatalogContext';
 import { useStreamGuard } from '@/hooks/useStreamGuard';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
@@ -121,7 +122,9 @@ function AppInner() {
 export default function App() {
   return (
     <AppProvider>
-      <AppInner />
+      <LiveCatalogProvider>
+        <AppInner />
+      </LiveCatalogProvider>
     </AppProvider>
   );
 }

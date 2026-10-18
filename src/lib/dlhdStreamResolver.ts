@@ -5,6 +5,10 @@ import {
   sortLivePaths,
 } from '@/lib/streamingSources';
 import { isPlayableStreamHtml } from '@/lib/dlhdPlayerUrls';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { platformFetch } from '@/lib/platformHttp';
+import { isNativeApp } from '@/lib/nativePlatform';
+import { useLiveApiProxy } from '@/lib/liveApiProxy';
 
 const SESSION_KEY = 'blvcktv-path-discovery-v2';
 const STORAGE_KEY = 'blvcktv-channel-paths-v2';
@@ -53,14 +57,14 @@ function isValidStreamHtml(html: string): boolean {
 
 async function fetchPathHtml(path: string, channelId: string): Promise<string | null> {
   const id = normalizeId(channelId);
-  const url = import.meta.env.DEV
+  const url = useLiveApiProxy()
     ? `/api/dlhd/resolve?path=${encodeURIComponent(path)}&id=${encodeURIComponent(id)}`
     : `https://dlhd.pk/${path}/stream-${id}.php`;
 
   try {
-    const res = await fetch(url, {
-      headers: { Accept: 'text/html', Referer: 'https://dlhd.pk/' },
-    });
+    const res = isNativeApp()
+      ? await platformFetch(url, { headers: { Accept: 'text/html', Referer: 'https://dlhd.pk/' } })
+      : await fetchWithTimeout(url, { headers: { Accept: 'text/html', Referer: 'https://dlhd.pk/' } });
     if (!res.ok) return null;
     return res.text();
   } catch {

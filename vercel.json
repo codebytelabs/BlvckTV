@@ -1,0 +1,23 @@
+{
+  "buildCommand": "yarn fetch-channels && yarn build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/dlhd/m3u8.ts": { "maxDuration": 30 },
+    "api/dlhd/playlist.ts": { "maxDuration": 30 },
+    "api/dlhd/frame.ts": { "maxDuration": 20 },
+    "api/dlhd/resolve.ts": { "maxDuration": 20 },
+    "api/dlhd/segment.ts": { "maxDuration": 15 },
+    "api/dlhd/channels.ts": { "maxDuration": 20 },
+    "api/dlhd/channels-page.ts": { "maxDuration": 20 },
+    "api/m3u.ts": { "maxDuration": 25 },
+    "api/m3u-probe.ts": { "maxDuration": 10 },
+    "api/m3u-stream.ts": { "maxDuration": 30 }
+  }
+}

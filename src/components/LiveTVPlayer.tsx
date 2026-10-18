@@ -9,6 +9,7 @@ import {
 } from '@/lib/dlhdStreamResolver';
 import { resolveLiveChannel } from '@/lib/liveChannelResolver';
 import { resolveLiveIframeSrc } from '@/lib/liveIframeSrc';
+import { isNativeApp } from '@/lib/nativePlatform';
 import {
   LIVE_CHANNEL_PATHS,
   LIVE_PATH_LABELS,
@@ -30,6 +31,8 @@ import {
 import { X, Monitor, Maximize, RefreshCw, Radio, List, ChevronDown } from 'lucide-react';
 import type { Channel } from '@/types';
 import type { SportsEvent } from '@/lib/sportsEvents';
+import { isM3uChannelId } from '@/lib/m3uCatalogs';
+import { wrapStreamPlaybackUrl } from '@/lib/m3uApi';
 import { resolveSportsChannel } from '@/lib/sportsChannelResolver';
 
 type PlaybackMode = 'hls' | 'iframe';
@@ -63,14 +66,30 @@ export default function LiveTVPlayer() {
     setSelectedChannel(null);
   }, [setSelectedChannel]);
 
-  const loadChannel = useCallback(async (channelId: string, server: LiveServer, _streamUrl?: string) => {
+  const loadChannel = useCallback(async (channelId: string, server: LiveServer, streamUrl?: string, provider?: Channel['provider']) => {
     const gen = ++loadGen.current;
+    const isM3u = provider === 'm3u' || isM3uChannelId(channelId);
+    const effectiveServer: LiveServer = isM3u || isNativeApp() ? 'hls' : server;
     setLoading(true);
     setM3u8Url(null);
     setIframeUrl(null);
     setHlsFailed(false);
 
-    if (server === 'hls') {
+    if (isM3u) {
+      setMode('hls');
+      const directUrl = streamUrl ? wrapStreamPlaybackUrl(streamUrl) : undefined;
+      if (gen !== loadGen.current) return;
+      if (directUrl) {
+        setM3u8Url(directUrl);
+        setLoading(false);
+        return;
+      }
+      setHlsFailed(true);
+      setLoading(false);
+      return;
+    }
+
+    if (effectiveServer === 'hls') {
       setMode('hls');
       const stream = await resolveM3u8Url(channelId);
       if (gen !== loadGen.current) return;
@@ -111,19 +130,27 @@ export default function LiveTVPlayer() {
 
     const streamUrl = selectedChannel.streamUrl
       ?? channels.find(c => c.id === selectedChannel.id)?.streamUrl;
+    const provider = selectedChannel.provider
+      ?? channels.find(c => c.id === selectedChannel.id)?.provider;
+    const isM3u = provider === 'm3u' || isM3uChannelId(selectedChannel.id);
 
-    const startServer = getPreferredPath(selectedChannel.id);
+    const startServer = isM3u || isNativeApp() ? 'hls' : getPreferredPath(selectedChannel.id);
     setCurrentServer(startServer);
-    void loadChannel(selectedChannel.id, startServer, streamUrl);
+    setMode(isM3u || isNativeApp() ? 'hls' : 'iframe');
+    void loadChannel(selectedChannel.id, startServer, streamUrl, provider);
 
-    void discoverPathsForChannel(selectedChannel.id).then(paths => {
-      setAvailablePaths(paths.length > 0 ? paths : [...LIVE_CHANNEL_PATHS]);
-    });
+    if (!isM3u) {
+      void discoverPathsForChannel(selectedChannel.id).then(paths => {
+        setAvailablePaths(paths.length > 0 ? paths : [...LIVE_CHANNEL_PATHS]);
+      });
+    } else {
+      setAvailablePaths([]);
+    }
 
     return () => {
       document.body.removeAttribute('data-player-open');
     };
-  }, [selectedChannel?.id, selectedChannel?.streamUrl, channels, loadChannel]);
+  }, [selectedChannel?.id, selectedChannel?.streamUrl, selectedChannel?.provider, channels, loadChannel]);
 
   const switchChannel = useCallback((channel: Channel) => {
     setSelectedChannel(resolveLiveChannel(channel, channels));
@@ -159,6 +186,9 @@ export default function LiveTVPlayer() {
 
   const channelStreamUrl = selectedChannel?.streamUrl
     ?? (selectedChannel ? channels.find(c => c.id === selectedChannel.id)?.streamUrl : undefined);
+  const channelProvider = selectedChannel?.provider
+    ?? (selectedChannel ? channels.find(c => c.id === selectedChannel.id)?.provider : undefined);
+  const isM3uPlayback = channelProvider === 'm3u' || (selectedChannel ? isM3uChannelId(selectedChannel.id) : false);
 
   const switchServer = useCallback((server: LiveServer) => {
     if (!selectedChannel) return;
@@ -168,11 +198,11 @@ export default function LiveTVPlayer() {
     if (server !== 'hls') {
       markPathWorking(selectedChannel.id, server);
     }
-    void loadChannel(selectedChannel.id, server, channelStreamUrl);
-  }, [selectedChannel, loadChannel, channelStreamUrl]);
+    void loadChannel(selectedChannel.id, server, channelStreamUrl, channelProvider);
+  }, [selectedChannel, loadChannel, channelStreamUrl, channelProvider]);
 
   const tryNextServer = useCallback(() => {
-    if (!selectedChannel) return;
+    if (!selectedChannel || isNativeApp()) return;
 
     const iframePaths = sortLivePaths(availablePaths);
     const pathKey =
@@ -184,15 +214,15 @@ export default function LiveTVPlayer() {
 
     if (nextIframe && currentServer !== 'hls') {
       setCurrentServer(nextIframe);
-      void loadChannel(selectedChannel.id, nextIframe, channelStreamUrl);
+      void loadChannel(selectedChannel.id, nextIframe, channelStreamUrl, channelProvider);
       return;
     }
 
     if (currentServer !== 'hls') {
       setCurrentServer('hls');
-      void loadChannel(selectedChannel.id, 'hls', channelStreamUrl);
+      void loadChannel(selectedChannel.id, 'hls', channelStreamUrl, channelProvider);
     }
-  }, [selectedChannel, availablePaths, currentServer, channelStreamUrl, loadChannel]);
+  }, [selectedChannel, availablePaths, currentServer, channelStreamUrl, channelProvider, loadChannel]);
 
   useEffect(() => {
     tryNextServerRef.current = tryNextServer;
@@ -224,30 +254,49 @@ export default function LiveTVPlayer() {
   const retry = useCallback(() => {
     if (selectedChannel) {
       autoFallbackRef.current = true;
-      void loadChannel(selectedChannel.id, currentServer, channelStreamUrl);
+      void loadChannel(selectedChannel.id, currentServer, channelStreamUrl, channelProvider);
     }
-  }, [selectedChannel, loadChannel, currentServer, channelStreamUrl]);
+  }, [selectedChannel, loadChannel, currentServer, channelStreamUrl, channelProvider]);
 
   const handleHlsError = useCallback(() => {
     if (!selectedChannel) return;
-    if (autoFallbackRef.current) {
+    if (isM3uPlayback) {
+      if (autoFallbackRef.current && m3u8Url) {
+        autoFallbackRef.current = false;
+        if (m3u8Url.startsWith('/api/m3u-stream?url=')) {
+          const raw = decodeURIComponent(m3u8Url.replace('/api/m3u-stream?url=', ''));
+          setM3u8Url(raw);
+          return;
+        }
+        if (m3u8Url.startsWith('http')) {
+          setM3u8Url(`/api/m3u-stream?url=${encodeURIComponent(m3u8Url)}`);
+          return;
+        }
+      }
+      setHlsFailed(true);
+      setM3u8Url(null);
+      setMode('hls');
+      return;
+    }
+    if (!isNativeApp() && autoFallbackRef.current) {
       autoFallbackRef.current = false;
       const fallback = availablePaths[0] ?? DEFAULT_LIVE_PATH;
       setCurrentServer(fallback);
-      void loadChannel(selectedChannel.id, fallback, channelStreamUrl);
+      void loadChannel(selectedChannel.id, fallback, channelStreamUrl, channelProvider);
       return;
     }
     setHlsFailed(true);
     setM3u8Url(null);
     setMode('hls');
-  }, [selectedChannel, availablePaths, channelStreamUrl, loadChannel]);
+  }, [selectedChannel, isM3uPlayback, m3u8Url, availablePaths, channelStreamUrl, channelProvider, loadChannel]);
 
   if (!selectedChannel) return null;
 
-  const menuServers: LiveServer[] = [
-    ...sortLivePaths(availablePaths),
-    'hls',
-  ];
+  const menuServers: LiveServer[] = isM3uPlayback
+    ? ['hls']
+    : isNativeApp()
+      ? ['hls']
+      : [...sortLivePaths(availablePaths), 'hls'];
 
   return (
     <div
@@ -265,12 +314,17 @@ export default function LiveTVPlayer() {
                 <span className="live-dot" /> LIVE
               </span>
               <span className="text-[#6b7280] truncate">
-                {mode === 'hls' ? '· direct stream' : `· ${serverLabel(currentServer)}`}
+                {isM3uPlayback
+                  ? '· public IPTV'
+                  : mode === 'hls'
+                    ? '· direct stream'
+                    : `· ${serverLabel(currentServer)}`}
               </span>
             </span>
           </div>
 
           <div className="relative" ref={serverMenuRef}>
+            {!isM3uPlayback && (
             <button
               type="button"
               onClick={() => setShowServerMenu(v => !v)}
@@ -282,11 +336,12 @@ export default function LiveTVPlayer() {
               <ChevronDown size={12} className="shrink-0" />
             </button>
 
-            {showServerMenu && (
+            )}
+
+            {showServerMenu && !isM3uPlayback && (
               <div className="absolute top-full right-0 mt-2 w-[min(16rem,calc(100vw-1.5rem))] rounded-xl bg-[#14141f] border border-[rgba(139,92,246,0.2)] overflow-hidden z-50 shadow-xl max-h-[50vh] overflow-y-auto">
                 {menuServers.map(server => {
                   const active = currentServer === server;
-                  const isRecommended = server === DEFAULT_LIVE_PATH;
                   return (
                     <button
                       key={server}
@@ -301,7 +356,7 @@ export default function LiveTVPlayer() {
                       <span className="font-semibold flex items-center gap-1.5">
                         {server === 'hls' && <Radio size={12} />}
                         {serverLabel(server)}
-                        {isRecommended && !active && (
+                        {(isNativeApp() ? server === 'hls' : server === DEFAULT_LIVE_PATH) && !active && (
                           <span className="text-[9px] text-[#10b981] font-bold">REC</span>
                         )}
                       </span>
@@ -395,11 +450,16 @@ export default function LiveTVPlayer() {
               src={m3u8Url}
               title={selectedChannel.name}
               onError={handleHlsError}
+              headerMode={isM3uPlayback ? 'none' : 'dlhd'}
             />
           ) : mode === 'hls' && hlsFailed ? (
             <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
-              <p className="text-sm text-[#9ca3af]">Clean · HLS stream unavailable for this channel.</p>
-              <p className="text-xs text-[#6b7280]">Try Watch or Player from the server menu.</p>
+              <p className="text-sm text-[#9ca3af]">Stream unavailable for this channel.</p>
+              <p className="text-xs text-[#6b7280]">
+                {isNativeApp()
+                  ? 'Check your connection and tap Retry.'
+                  : 'Try Watch or Player from the server menu.'}
+              </p>
               <button
                 type="button"
                 onClick={retry}

@@ -83,9 +83,9 @@ export default function VideoPlayer() {
 
   useEffect(() => {
     if (selectedVideo) {
-      setCurrentSource((settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource);
+      setCurrentSource((selectedVideo.source || settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource);
     }
-  }, [selectedVideo, settings.sourcePriority]);
+  }, [selectedVideo?.tmdbId, selectedVideo?.type, selectedVideo?.source, settings.sourcePriority]);
 
   useEffect(() => {
     if (!selectedVideo || selectedVideo.type !== 'tv') return;

@@ -2,72 +2,103 @@ import type { Channel } from '@/types';
 
 export type { Channel };
 
-/** Hardcoded fallback channels with real DLHD stream IDs */
+const DLHD = 'https://dlhd.pk';
+
+function fb(id: string, name: string, category: string, country: string): Channel {
+  return {
+    id,
+    name,
+    logo: `${DLHD}/logos/${id}.png`,
+    category,
+    country,
+    isLive: true,
+    streamUrl: `${DLHD}/watch/stream-${id}.php`,
+    altPaths: ['watch', 'player', 'plus', 'casting', 'cast', 'stream'],
+  };
+}
+
+function fbSport(id: string, name: string, country: string, streamUrl: string, logo = ''): Channel {
+  return {
+    id: `m3u-sport-${id}`,
+    name,
+    logo,
+    category: 'Sports',
+    country,
+    isLive: true,
+    streamUrl,
+    provider: 'm3u',
+  };
+}
+
+/** Hardcoded fallback channels with working public HLS sports streams */
 export const FALLBACK_CHANNELS: Channel[] = [
-  { id: '51', name: 'ABC', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ABC-2021-LOGO.svg/1200px-ABC-2021-LOGO.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '52', name: 'CBS', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/CBS_logo.svg/1200px-CBS_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '53', name: 'NBC', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/NBC_logo.svg/1200px-NBC_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '54', name: 'FOX', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Fox_Networks_Group_USA_logo.svg/1200px-Fox_Networks_Group_USA_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '300', name: 'CW', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/The_CW_logo_2024.svg/1200px-The_CW_logo_2024.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '44', name: 'ESPN', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_logo.svg/1200px-ESPN_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '45', name: 'ESPN 2', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/ESPN_logo.svg/1200px-ESPN_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '39', name: 'Fox Sports 1', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f7/Fox_Networks_Group_USA_logo.svg/1200px-Fox_Networks_Group_USA_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '405', name: 'NFL Network', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/2/2f/NFL_Network_logo.svg/1200px-NFL_Network_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '404', name: 'NBA TV', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/5/53/NBA_TV_logo.svg/1200px-NBA_TV_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '345', name: 'CNN', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b1/CNN.svg/1200px-CNN.svg.png', category: 'News', country: 'US', isLive: true },
-  { id: '349', name: 'BBC News', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/BBC_News_2022_%28Alt%29.svg/1200px-BBC_News_2022_%28Alt%29.svg.png', category: 'News', country: 'UK', isLive: true },
-  { id: '347', name: 'Fox News', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Fox_News_Channel_logo.svg/1200px-Fox_News_Channel_logo.svg.png', category: 'News', country: 'US', isLive: true },
-  { id: '327', name: 'MSNBC', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/MSNBC_2015_logo.svg/1200px-MSNBC_2015_logo.svg.png', category: 'News', country: 'US', isLive: true },
-  { id: '339', name: 'Cartoon Network', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Cartoon_Network_logo_2004.svg/1200px-Cartoon_Network_logo_2004.svg.png', category: 'Kids', country: 'US', isLive: true },
-  { id: '312', name: 'Disney Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/2019_Disney_Channel_logo.svg/1200px-2019_Disney_Channel_logo.svg.png', category: 'Kids', country: 'US', isLive: true },
-  { id: '329', name: 'Nickelodeon', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Nickelodeon_2023_logo.svg/1200px-Nickelodeon_2023_logo.svg.png', category: 'Kids', country: 'US', isLive: true },
-  { id: '321', name: 'HBO', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/de/HBO_logo.svg/1200px-HBO_logo.svg.png', category: 'Movies', country: 'US', isLive: true },
-  { id: '374', name: 'Cinemax', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Cinemax_2016.svg/1200px-Cinemax_2016.svg.png', category: 'Movies', country: 'US', isLive: true },
-  { id: '333', name: 'Showtime', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Showtime_2024.svg/1200px-Showtime_2024.svg.png', category: 'Movies', country: 'US', isLive: true },
-  { id: '367', name: 'MTV', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/MTV_Logo_2010.svg/1200px-MTV_Logo_2010.svg.png', category: 'Music', country: 'US', isLive: true },
-  { id: '344', name: 'VH1', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/VH1_logo.svg/1200px-VH1_logo.svg.png', category: 'Music', country: 'US', isLive: true },
-  { id: '311', name: 'Discovery', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Discovery_Channel_logo.svg/1200px-Discovery_Channel_logo.svg.png', category: 'Documentary', country: 'US', isLive: true },
-  { id: '328', name: 'National Geographic', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fc/Natgeologo.svg/1200px-Natgeologo.svg.png', category: 'Documentary', country: 'US', isLive: true },
-  { id: '322', name: 'History Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/History_Logo.svg/1200px-History_Logo.svg.png', category: 'Documentary', country: 'US', isLive: true },
-  { id: '338', name: 'TNT', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/TNT_2016_logo.svg/1200px-TNT_2016_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '343', name: 'USA Network', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/USA_Network_logo_2015.svg/1200px-USA_Network_logo_2015.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '303', name: 'AMC', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/AMC_logo_2019.svg/1200px-AMC_logo_2019.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '336', name: 'TBS', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c6/TBS_logo_2015.svg/1200px-TBS_logo_2015.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '373', name: 'Syfy', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Syfy_logo.svg/1200px-Syfy_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '310', name: 'Comedy Central', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/aa/Comedy_Central_2018.svg/1200px-Comedy_Central_2018.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '317', name: 'FX', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/FX_International_logo.svg/1200px-FX_International_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '307', name: 'Bravo', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Bravo_TV.svg/1200px-Bravo_TV.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '382', name: 'HGTV', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/HGTV_logo.svg/1200px-HGTV_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '384', name: 'Food Network', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Food_Network_logo.svg/1200px-Food_Network_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '340', name: 'Travel Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Travel_Channel_logo.svg/1200px-Travel_Channel_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '337', name: 'TLC', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/TLC_Logo.svg/1200px-TLC_Logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '304', name: 'Animal Planet', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Animal_Planet_logo.svg/1200px-Animal_Planet_logo.svg.png', category: 'Documentary', country: 'US', isLive: true },
-  { id: '294', name: 'Science Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Science_Channel_logo.svg/1200px-Science_Channel_logo.svg.png', category: 'Documentary', country: 'US', isLive: true },
-  { id: '399', name: 'MLB Network', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/4/4f/MLB_Network_logo.svg/1200px-MLB_Network_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '663', name: 'NHL Network', logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/4/4f/NHL_Network_logo.svg/1200px-NHL_Network_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '318', name: 'Golf Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Golf_Channel_logo.svg/1200px-Golf_Channel_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '40', name: 'Tennis Channel', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Tennis_Channel_logo.svg/1200px-Tennis_Channel_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '425', name: 'BeIN Sports', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/BeIN_Sports_logo.svg/1200px-BeIN_Sports_logo.svg.png', category: 'Sports', country: 'US', isLive: true },
-  { id: '38', name: 'Sky Sports', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Sky_Sports_logo.svg/1200px-Sky_Sports_logo.svg.png', category: 'Sports', country: 'UK', isLive: true },
-  { id: '230', name: 'DAZN', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/DAZN_logo.svg/1200px-DAZN_logo.svg.png', category: 'Sports', country: 'UK', isLive: true },
-  { id: '41', name: 'Eurosport', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Eurosport_logo.svg/1200px-Eurosport_logo.svg.png', category: 'Sports', country: 'EU', isLive: true },
-  { id: '334', name: 'Paramount Network', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Paramount_Network_logo.svg/1200px-Paramount_Network_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
-  { id: '315', name: 'E!', logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/E%21_logo.svg/1200px-E%21_logo.svg.png', category: 'Entertainment', country: 'US', isLive: true },
+  fb('51', 'ABC', 'Entertainment', 'US'),
+  fb('52', 'CBS', 'Entertainment', 'US'),
+  fb('53', 'NBC', 'Entertainment', 'US'),
+  fb('54', 'FOX', 'Entertainment', 'US'),
+  fb('300', 'CW', 'Entertainment', 'US'),
+  fbSport('espn', 'ESPN (ACC Network)', 'US', 'https://raycom-accdn-firetv.amagi.tv/playlist.m3u8'),
+  fbSport('bein1', 'beIN Sports 1 HD', 'INT', 'https://andro.mangeinde4.lat/checklist/androstreamlivebs1.m3u8'),
+  fbSport('aspor', 'A Spor HD', 'TR', 'https://rnttwmjcin.turknet.ercdn.net/lcpmvefbyo/aspor/aspor.m3u8'),
+  fbSport('bahrain1', 'Bahrain Sports 1 HD', 'MENA', 'https://5c7b683162943.streamlock.net/live/ngrp:sportsone_all/playlist.m3u8'),
+  fbSport('bahrain2', 'Bahrain Sports 2 HD', 'MENA', 'https://5c7b683162943.streamlock.net/live/ngrp:bahrainsportstwo_all/playlist.m3u8'),
+  fbSport('acisport', 'ACI Sport TV HD', 'IT', 'https://webstream.multistream.it/memfs/e2cb3629-c1a2-495b-b43a-9eb386f04ed8.m3u8'),
+  fbSport('golf', '30A Golf Kingdom', 'US', 'https://30a-tv.com/feeds/vidaa/golf.m3u8'),
+  fbSport('iraqia', 'Iraqia Sports HD', 'MENA', 'https://imn-live.esite-lab.com/hls/iraqia-sports-1.m3u8'),
+  fbSport('as3', 'AS3 Sport TV', 'EU', 'https://streamtv.as3sport.online:3394/hybrid/play.m3u8'),
+  fbSport('atg', 'ATG Live Racing', 'SE', 'https://kanal75xto-llhls.akamaized.net/live/Data/atg-kanal-15-02a-rr/HLS-Legacy-HL/atg-kanal-15-02a-rr.m3u8'),
+  fbSport('astrahan', 'Astrahan Sport HD', 'RU', 'https://streaming.astrakhan.ru/astrakhanrusporthd/playlist.m3u8'),
+  fb('345', 'CNN', 'News', 'US'),
+  fb('349', 'BBC News', 'News', 'UK'),
+  fb('347', 'Fox News', 'News', 'US'),
+  fb('327', 'MSNBC', 'News', 'US'),
+  fb('339', 'Cartoon Network', 'Kids', 'US'),
+  fb('312', 'Disney Channel', 'Kids', 'US'),
+  fb('329', 'Nickelodeon', 'Kids', 'US'),
+  fb('321', 'HBO', 'Movies', 'US'),
+  fb('374', 'Cinemax', 'Movies', 'US'),
+  fb('333', 'Showtime', 'Movies', 'US'),
+  fb('367', 'MTV', 'Music', 'US'),
+  fb('344', 'VH1', 'Music', 'US'),
+  fb('311', 'Discovery', 'Documentary', 'US'),
+  fb('328', 'National Geographic', 'Documentary', 'US'),
+  fb('322', 'History Channel', 'Documentary', 'US'),
 ];
 
 /** @deprecated Use useChannels() — kept for backwards compatibility */
 export const CHANNELS = FALLBACK_CHANNELS;
 
 export function getCategoriesFrom(channels: Channel[]): string[] {
-  return [...new Set(channels.map(c => c.category))].sort();
+  const set = new Set<string>();
+  for (let i = 0; i < channels.length; i += 1) {
+    const raw = channels[i].category;
+    if (!raw) continue;
+    if (raw.includes(';')) {
+      const parts = raw.split(';');
+      for (let j = 0; j < parts.length; j += 1) {
+        const trimmed = parts[j].trim();
+        if (trimmed) set.add(trimmed);
+      }
+    } else {
+      const trimmed = raw.trim();
+      if (trimmed) set.add(trimmed);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 export function getCountriesFrom(channels: Channel[]): string[] {
   return [...new Set(channels.map(c => c.country))].sort();
 }
 
+const SPORTS_KEYWORD_RE =
+  /\b(sports?|espn|bein|dazn|eurosport|sky\s*sports?|tnt\s*sports?|fox\s*sports?|fs1|fs2|tsn|nfl|nba|mlb|nhl|f1|formula\s*1|ufc|wwe|premier\s*league|epl|laliga|serie\s*a|bundesliga|ucl|champions\s*league|cricket|willow|tennis|golf|motorsport|football|soccer|boxing|racing|supersport|viaplay\s*sport|optus\s*sport|acc\s*digital)\b/i;
+
 export function getSportsChannelsFrom(channels: Channel[]): Channel[] {
-  return channels.filter(c => c.category === 'Sports');
+  const matched = channels.filter(
+    c => SPORTS_KEYWORD_RE.test(c.category || '') || SPORTS_KEYWORD_RE.test(c.name || ''),
+  );
+  return matched.length > 0 ? matched : FALLBACK_CHANNELS.filter(c => c.category === 'Sports');
 }
 
 export const CATEGORIES = getCategoriesFrom(FALLBACK_CHANNELS);

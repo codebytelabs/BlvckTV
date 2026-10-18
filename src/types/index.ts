@@ -56,6 +56,8 @@ export interface Genre {
   name: string;
 }
 
+export type ChannelProvider = 'dlhd' | 'm3u';
+
 export interface Channel {
   id: string;
   name: string;
@@ -65,7 +67,18 @@ export interface Channel {
   isLive: boolean;
   streamUrl?: string;
   altPaths?: string[];
+  /** dlhd = multi-server embeds; m3u = direct HLS URL */
+  provider?: ChannelProvider;
+  m3uCatalogId?: string;
 }
+
+export type SelectedLiveChannel = {
+  id: string;
+  name: string;
+  logo: string;
+  streamUrl?: string;
+  provider?: ChannelProvider;
+};
 
 export interface FavoriteChannel {
   id: string;
@@ -126,6 +139,7 @@ export type SelectedVideo = {
   title: string;
   imdbId?: string | null;
   poster_path?: string | null;
+  source?: StreamingSource;
 };
 
 export type MovieCatalogMode = 'popular' | 'trending' | 'top_rated' | 'now_playing' | 'upcoming';

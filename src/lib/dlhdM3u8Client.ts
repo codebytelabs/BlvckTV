@@ -1,4 +1,5 @@
 import { getDirectPlayerUrl, getDlhdWrapperUrl } from '@/lib/dlhdPlayerUrls';
+import { platformFetchText } from '@/lib/platformHttp';
 
 const PLAYER_SOURCES = [
   (id: string) => getDirectPlayerUrl(id),
@@ -34,23 +35,7 @@ function extractIframes(html: string): string[] {
   return urls;
 }
 
-async function fetchHtml(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
-        Referer: 'https://dlhd.pk/',
-        Accept: 'text/html',
-      },
-    });
-    if (!res.ok) return null;
-    return res.text();
-  } catch {
-    return null;
-  }
-}
-
-/** Resolve direct HLS URL from DLHD player pages (works in browser / Capacitor WebView). */
+/** Resolve direct HLS URL from DLHD player pages (native HTTP on Android). */
 export async function resolveM3u8FromDlhd(channelId: string): Promise<string | null> {
   const id = channelId.replace(/\D/g, '') || channelId;
   const visited = new Set<string>();
@@ -59,7 +44,11 @@ export async function resolveM3u8FromDlhd(channelId: string): Promise<string | n
     if (depth > 3 || visited.has(url)) return null;
     visited.add(url);
 
-    const html = await fetchHtml(url);
+    const html = await platformFetchText(url, {
+      headers: {
+        Accept: 'text/html',
+      },
+    });
     if (!html) return null;
 
     const direct = parseM3u8FromHtml(html);

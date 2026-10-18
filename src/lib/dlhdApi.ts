@@ -1,8 +1,15 @@
 import type { Channel } from '@/types';
+import { readPersistentCache, writePersistentCache, removePersistentCache } from '@/lib/persistentCache';
+import { FALLBACK_CHANNELS } from '@/lib/channels';
+import { platformFetch } from '@/lib/platformHttp';
+import { useLiveApiProxy } from '@/lib/liveApiProxy';
+import bundledCatalog from '@/data/channels-bundled.json';
 
 const DLHD_BASE = 'https://dlhd.pk';
 const LOGO_BASE = `${DLHD_BASE}/logos/`;
-const CACHE_KEY = 'blvcktv-dlhd-channels-v3';
+const CACHE_KEY = 'blvcktv-dlhd-channels-v5';
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const MIN_CATALOG_SIZE = 100;
 
 export type DlhdRawChannel = {
   channel_id: string;
@@ -22,7 +29,15 @@ type DlhdApiResponse = {
 
 export type FetchChannelsResult = {
   channels: Channel[];
-  source: 'api' | 'html' | 'cache';
+  source: 'api' | 'html' | 'cache' | 'bundled' | 'fallback';
+  offline?: boolean;
+};
+
+const FETCH_HEADERS = {
+  Accept: 'application/json, text/html, */*',
+  Referer: `${DLHD_BASE}/`,
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
 
 const SPORTS_KEYWORDS = [
@@ -33,13 +48,9 @@ const SPORTS_KEYWORDS = [
 ];
 
 const NEWS_KEYWORDS = ['news', 'cnn', 'msnbc', 'fox news', 'cnbc', 'bbc news', 'sky news'];
-
 const KIDS_KEYWORDS = ['kids', 'cartoon', 'disney', 'nick', 'boomerang', 'nickelodeon', 'pbs kids'];
-
 const MOVIES_KEYWORDS = ['hbo', 'cinemax', 'showtime', 'starz', 'movie', 'cinema', 'film'];
-
 const MUSIC_KEYWORDS = ['mtv', 'vh1', 'music', 'cmusic'];
-
 const DOC_KEYWORDS = [
   'discovery', 'national geographic', 'history', 'documentary', 'animal planet',
   'science channel', 'nat geo', 'ngc',
@@ -64,12 +75,14 @@ const COUNTRY_PATTERNS: Array<{ pattern: RegExp; code: string }> = [
   { pattern: /\b(philippines|ph\b)/i, code: 'PH' },
 ];
 
-function resolveLogoUrl(logoUrl?: string): string {
-  if (!logoUrl) return '';
-  if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
-  const path = logoUrl.startsWith('/') ? logoUrl.slice(1) : logoUrl;
-  if (path.startsWith('logos/')) return `${DLHD_BASE}/${path}`;
-  return `${LOGO_BASE}${path.replace(/^logos\//, '')}`;
+function resolveLogoUrl(logoUrl: string | undefined, channelId: string): string {
+  if (logoUrl) {
+    if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) return logoUrl;
+    const path = logoUrl.startsWith('/') ? logoUrl.slice(1) : logoUrl;
+    if (path.startsWith('logos/')) return `${DLHD_BASE}/${path}`;
+    return `${LOGO_BASE}${path.replace(/^logos\//, '')}`;
+  }
+  return `${LOGO_BASE}${channelId}.png`;
 }
 
 function inferCategory(name: string, apiCategory?: string): string {
@@ -97,17 +110,22 @@ export function mapDlhdChannel(raw: DlhdRawChannel): Channel {
   return {
     id,
     name: raw.channel_name.trim(),
-    logo: resolveLogoUrl(raw.logo_url),
+    logo: resolveLogoUrl(raw.logo_url, id),
     category: inferCategory(raw.channel_name, raw.category),
     country: inferCountry(raw.channel_name, raw.country),
     isLive: true,
-    streamUrl: `${DLHD_BASE}/stream/stream-${id}.php`,
+    streamUrl: `${DLHD_BASE}/watch/stream-${id}.php`,
     altPaths: ['watch', 'player', 'plus', 'casting', 'cast', 'stream'],
   };
 }
 
+function getBundledChannels(): Channel[] {
+  if (!Array.isArray(bundledCatalog.channels)) return [];
+  return bundledCatalog.channels.map(mapDlhdChannel);
+}
+
 function getApiUrl(): string {
-  if (import.meta.env.DEV) {
+  if (useLiveApiProxy()) {
     return '/api/dlhd/channels';
   }
   const key = import.meta.env.VITE_DLHD_API_KEY;
@@ -119,15 +137,13 @@ function getApiUrl(): string {
 
 async function fetchFromProtectedApi(): Promise<Channel[]> {
   const url = getApiUrl();
-  const isHtmlFallback = !import.meta.env.DEV && !import.meta.env.VITE_DLHD_API_KEY;
+  const isHtmlFallback = !useLiveApiProxy() && !import.meta.env.VITE_DLHD_API_KEY;
 
   if (isHtmlFallback) {
     return fetchFromChannelsPage();
   }
 
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json' },
-  });
+  const res = await platformFetch(url, { headers: FETCH_HEADERS });
   if (!res.ok) {
     throw new Error(`DLHD API HTTP ${res.status}`);
   }
@@ -150,8 +166,37 @@ async function fetchFromProtectedApi(): Promise<Channel[]> {
   return data.map(mapDlhdChannel);
 }
 
-const HTML_CHANNEL_RE =
-  /<a class="card"[\s\S]*?href="\/watch\.php\?id=(\d+)"[\s\S]*?data-title="([^"]*)"[\s\S]*?<div class="card__title">([^<]+)<\/div>/gi;
+const HTML_PARSERS: Array<(html: string, seen: Set<string>) => Channel[]> = [
+  (html, seen) => {
+    const re =
+      /<a class="card"[\s\S]*?href="\/watch\.php\?id=(\d+)"[\s\S]*?data-title="([^"]*)"[\s\S]*?<div class="card__title">([^<]+)<\/div>/gi;
+    return collectFromRegex(re, html, seen, m => ({
+      id: m[1],
+      name: decodeHtmlEntities(m[3].trim() || m[2].trim()),
+    }));
+  },
+  (html, seen) => {
+    const re = /href="\/watch\.php\?id=(\d+)"[^>]*data-title="([^"]*)"/gi;
+    return collectFromRegex(re, html, seen, m => ({
+      id: m[1],
+      name: decodeHtmlEntities(m[2].trim()),
+    }));
+  },
+  (html, seen) => {
+    const re = /data-title="([^"]*)"[^>]*href="\/watch\.php\?id=(\d+)"/gi;
+    return collectFromRegex(re, html, seen, m => ({
+      id: m[2],
+      name: decodeHtmlEntities(m[1].trim()),
+    }));
+  },
+  (html, seen) => {
+    const re = /watch\.php\?id=(\d+)[^>]*>\s*([^<]{2,120})\s*</gi;
+    return collectFromRegex(re, html, seen, m => ({
+      id: m[1],
+      name: decodeHtmlEntities(m[2].trim()),
+    }));
+  },
+];
 
 function decodeHtmlEntities(text: string): string {
   return text
@@ -162,29 +207,45 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&#39;/g, "'");
 }
 
+function collectFromRegex(
+  re: RegExp,
+  html: string,
+  seen: Set<string>,
+  pick: (match: RegExpExecArray) => { id: string; name: string },
+): Channel[] {
+  const channels: Channel[] = [];
+  re.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(html)) !== null) {
+    const { id, name } = pick(match);
+    if (!id || !name || seen.has(id)) continue;
+    seen.add(id);
+    channels.push(mapDlhdChannel({ channel_id: id, channel_name: name }));
+  }
+  return channels;
+}
+
+function parseChannelsFromHtml(html: string): Channel[] {
+  const seen = new Set<string>();
+  const channels: Channel[] = [];
+  for (const parser of HTML_PARSERS) {
+    channels.push(...parser(html, seen));
+  }
+  return channels;
+}
+
 async function fetchFromChannelsPage(): Promise<Channel[]> {
-  const url = import.meta.env.DEV
+  const url = useLiveApiProxy()
     ? '/api/dlhd/channels-page'
     : `${DLHD_BASE}/24-7-channels.php`;
 
-  const res = await fetch(url, { headers: { Accept: 'text/html' } });
+  const res = await platformFetch(url, { headers: FETCH_HEADERS });
   if (!res.ok) {
     throw new Error(`DLHD channels page HTTP ${res.status}`);
   }
 
   const html = await res.text();
-  const channels: Channel[] = [];
-  const seen = new Set<string>();
-
-  let match: RegExpExecArray | null;
-  HTML_CHANNEL_RE.lastIndex = 0;
-  while ((match = HTML_CHANNEL_RE.exec(html)) !== null) {
-    const [, id, , titleRaw] = match;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const name = decodeHtmlEntities(titleRaw.trim());
-    channels.push(mapDlhdChannel({ channel_id: id, channel_name: name }));
-  }
+  const channels = parseChannelsFromHtml(html);
 
   if (channels.length === 0) {
     throw new Error('No channels parsed from DLHD page');
@@ -193,22 +254,31 @@ async function fetchFromChannelsPage(): Promise<Channel[]> {
   return channels;
 }
 
-function readSessionCache(): Channel[] | null {
+function readChannelCache(): Channel[] | null {
+  const persistent = readPersistentCache<Channel[]>(CACHE_KEY);
+  if (persistent && persistent.length >= MIN_CATALOG_SIZE) return persistent;
+  if (persistent && persistent.length < MIN_CATALOG_SIZE) {
+    removePersistentCache(CACHE_KEY);
+  }
+
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { channels: Channel[]; expiresAt: number };
-    if (Date.now() > parsed.expiresAt) {
+    if (Date.now() > parsed.expiresAt || parsed.channels.length < MIN_CATALOG_SIZE) {
       sessionStorage.removeItem(CACHE_KEY);
       return null;
     }
+    writePersistentCache(CACHE_KEY, parsed.channels, CACHE_TTL_MS);
     return parsed.channels;
   } catch {
     return null;
   }
 }
 
-function writeSessionCache(channels: Channel[]): void {
+function writeChannelCache(channels: Channel[]): void {
+  if (channels.length < MIN_CATALOG_SIZE) return;
+  writePersistentCache(CACHE_KEY, channels, CACHE_TTL_MS);
   try {
     sessionStorage.setItem(
       CACHE_KEY,
@@ -219,29 +289,45 @@ function writeSessionCache(channels: Channel[]): void {
   }
 }
 
+function bundledResult(): FetchChannelsResult {
+  const channels = getBundledChannels();
+  return {
+    channels: channels.length > 0 ? channels : FALLBACK_CHANNELS,
+    source: channels.length > 0 ? 'bundled' : 'fallback',
+    offline: channels.length === 0,
+  };
+}
+
+export function getBootstrapChannels(): FetchChannelsResult {
+  const cached = readChannelCache();
+  if (cached?.length) {
+    return { channels: cached, source: 'cache' };
+  }
+  return bundledResult();
+}
+
 export async function fetchDlhdChannels(): Promise<FetchChannelsResult> {
-  const cached = readSessionCache();
+  const cached = readChannelCache();
   if (cached?.length) {
     return { channels: cached, source: 'cache' };
   }
 
   try {
     const channels = await fetchFromProtectedApi();
-    writeSessionCache(channels);
+    writeChannelCache(channels);
     return { channels, source: 'api' };
-  } catch (apiError) {
+  } catch {
     try {
       const channels = await fetchFromChannelsPage();
-      writeSessionCache(channels);
+      writeChannelCache(channels);
       return { channels, source: 'html' };
-    } catch (htmlError) {
-      const apiMsg = apiError instanceof Error ? apiError.message : 'API failed';
-      const htmlMsg = htmlError instanceof Error ? htmlError.message : 'HTML parse failed';
-      throw new Error(`${apiMsg}; fallback: ${htmlMsg}`);
+    } catch {
+      return bundledResult();
     }
   }
 }
 
 export function clearDlhdCache(): void {
+  removePersistentCache(CACHE_KEY);
   sessionStorage.removeItem(CACHE_KEY);
 }

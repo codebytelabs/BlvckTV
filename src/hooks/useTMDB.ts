@@ -287,20 +287,52 @@ export function useTMDB() {
   [wrap]);
 
   const fetchMovieDetails = useCallback((id: number) =>
-    wrap(() => fetchTMDB<Movie>(`/movie/${id}?language=en-US&append_to_response=credits`)),
+    wrap(
+      () => fetchTMDB<Movie>(`/movie/${id}?language=en-US&append_to_response=credits`),
+      () => FALLBACK_MOVIES.find(m => m.id === id) ?? {
+        ...FALLBACK_MOVIES[0],
+        id,
+      },
+    ),
   [wrap]);
 
   const fetchTVDetails = useCallback((id: number) =>
-    wrap(async () => {
-      const data = await fetchTMDB<TVShow & { external_ids?: { imdb_id?: string } }>(
-        `/tv/${id}?language=en-US&append_to_response=credits,external_ids`,
-      );
-      return { ...data, imdb_id: data.external_ids?.imdb_id ?? data.imdb_id };
-    }),
+    wrap<TVShow>(
+      async () => {
+        const data = await fetchTMDB<TVShow & { external_ids?: { imdb_id?: string } }>(
+          `/tv/${id}?language=en-US&append_to_response=credits,external_ids`,
+        );
+        return { ...data, imdb_id: data.external_ids?.imdb_id ?? data.imdb_id };
+      },
+      () => {
+        const match = FALLBACK_TV.find(t => t.id === id) ?? { ...FALLBACK_TV[0], id };
+        return { ...match, number_of_seasons: match.number_of_seasons ?? 3 };
+      },
+    ),
   [wrap]);
 
   const fetchTVSeason = useCallback((id: number, season: number) =>
-    wrap(() => fetchTMDB<TVSeason>(`/tv/${id}/season/${season}?language=en-US`)),
+    wrap(
+      () => fetchTMDB<TVSeason>(`/tv/${id}/season/${season}?language=en-US`),
+      () => ({
+        id: id * 100 + season,
+        name: `Season ${season}`,
+        season_number: season,
+        episode_count: 10,
+        poster_path: null,
+        air_date: '2024-01-01',
+        episodes: Array.from({ length: 10 }, (_, idx) => ({
+          id: id * 1000 + season * 100 + idx + 1,
+          name: `Episode ${idx + 1}`,
+          overview: `Season ${season}, Episode ${idx + 1}`,
+          still_path: null,
+          episode_number: idx + 1,
+          season_number: season,
+          air_date: '2024-01-01',
+          runtime: 45,
+        })),
+      }),
+    ),
   [wrap]);
 
   const searchMulti = useCallback((query: string) =>

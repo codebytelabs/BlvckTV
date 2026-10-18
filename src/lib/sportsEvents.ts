@@ -56,6 +56,41 @@ function getEventDurationMs(league: SportsLeague): number {
   return EVENT_DURATION_MS[league] ?? DEFAULT_EVENT_DURATION_MS;
 }
 
+const BASE_REFERENCE_MIDNIGHT = new Date('2026-06-25T00:00:00').getTime();
+
+function dynamicStartTime(event: SportsEvent, now: number): string {
+  if (event.id === 'live-wc-can-mex') {
+    return new Date(now - 58 * 60 * 1000).toISOString();
+  }
+  if (event.id === 'live-wc-qual-bh-qat') {
+    return new Date(now - 41 * 60 * 1000).toISOString();
+  }
+  if (event.id === 'wc-bra-mar') {
+    return new Date(now + 45 * 60 * 1000).toISOString();
+  }
+
+  const orig = new Date(event.startTime);
+  if (Number.isNaN(orig.getTime())) return new Date(now + 3600 * 1000).toISOString();
+
+  const origMidnight = new Date(orig);
+  origMidnight.setHours(0, 0, 0, 0);
+  const rawDayDiff = Math.round((origMidnight.getTime() - BASE_REFERENCE_MIDNIGHT) / (24 * 60 * 60 * 1000));
+  const dayOffset = Math.max(0, Math.min(rawDayDiff, 21));
+
+  const target = new Date(now);
+  target.setHours(0, 0, 0, 0);
+  target.setDate(target.getDate() + dayOffset);
+  target.setHours(orig.getHours(), orig.getMinutes(), 0, 0);
+
+  if (target.getTime() <= now + 15 * 60 * 1000) {
+    if (dayOffset === 0) {
+      return new Date(now + 2 * 60 * 60 * 1000).toISOString();
+    }
+    target.setDate(target.getDate() + 1);
+  }
+  return target.toISOString();
+}
+
 export function resolveEventStatus(event: SportsEvent, now = Date.now()): EventStatus {
   const start = new Date(event.startTime).getTime();
   const end = start + getEventDurationMs(event.league);
@@ -66,8 +101,8 @@ export function resolveEventStatus(event: SportsEvent, now = Date.now()): EventS
   return 'past';
 }
 
-function computeLiveMinute(startTime: string, league: SportsLeague): string {
-  const elapsedMin = Math.floor((Date.now() - new Date(startTime).getTime()) / 60000);
+function computeLiveMinute(startTime: string, league: SportsLeague, now = Date.now()): string {
+  const elapsedMin = Math.max(1, Math.floor((now - new Date(startTime).getTime()) / 60000));
   const isFootball = ['World Cup', 'WC Qualifiers', 'Euro', 'EPL', 'UCL', 'Olympics'].includes(league);
 
   if (isFootball) {
@@ -79,13 +114,15 @@ function computeLiveMinute(startTime: string, league: SportsLeague): string {
   return `${elapsedMin}'`;
 }
 
-/** Attach live / soon state from wall-clock time (ignores stale static flags). */
+/** Attach live / soon state from wall-clock time (shifts static schedule relative to today). */
 export function enrichSportsEvent(event: SportsEvent, now = Date.now()): SportsEvent {
-  const status = resolveEventStatus(event, now);
+  const startTime = dynamicStartTime(event, now);
+  const shifted: SportsEvent = { ...event, startTime };
+  const status = resolveEventStatus(shifted, now);
   return {
-    ...event,
+    ...shifted,
     isLive: status === 'live',
-    liveMinute: status === 'live' ? computeLiveMinute(event.startTime, event.league) : undefined,
+    liveMinute: status === 'live' ? computeLiveMinute(startTime, shifted.league, now) : undefined,
   };
 }
 

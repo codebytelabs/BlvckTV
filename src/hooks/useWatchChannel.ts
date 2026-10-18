@@ -4,9 +4,7 @@ import { useChannels } from '@/hooks/useChannels';
 import { resolveLiveChannel } from '@/lib/liveChannelResolver';
 import type { Channel } from '@/types';
 
-type WatchChannelInput = Pick<Channel, 'id' | 'name' | 'logo'> & {
-  streamUrl?: string;
-};
+type WatchChannelInput = Pick<Channel, 'id' | 'name' | 'logo' | 'streamUrl' | 'provider'>;
 
 /** Same channel resolution path Sports uses — always attach catalog streamUrl + normalized id. */
 export function useWatchChannel() {

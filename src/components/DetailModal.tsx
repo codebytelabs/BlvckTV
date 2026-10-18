@@ -66,6 +66,7 @@ export default function DetailModal() {
       episode,
       imdbId: item.imdb_id,
       poster_path: item.poster_path,
+      source: currentSource,
     });
     setSelectedDetail(null);
   };

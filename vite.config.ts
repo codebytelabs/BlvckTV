@@ -3,11 +3,12 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 import { inspectAttr } from 'kimi-plugin-inspect-react'
 import { dlhdM3u8Plugin } from './vite-plugin-dlhd-m3u8'
+import { m3uProxyPlugin } from './vite-plugin-m3u-proxy'
 
 // https://vite.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [inspectAttr(), react(), dlhdM3u8Plugin()],
+  plugins: [inspectAttr(), react(), dlhdM3u8Plugin(), m3uProxyPlugin()],
   server: {
     port: 3000,
     proxy: {

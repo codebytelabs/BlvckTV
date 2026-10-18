@@ -3,8 +3,8 @@ import type { StreamingSource } from '@/types';
 /** Default VOD source order (first = preferred). */
 export const DEFAULT_SOURCE_PRIORITY: StreamingSource[] = [
   'vidsrcme',
-  'vidking',
   'vidsrcto',
+  'vidking',
   'vidsync',
   'rivestream',
   'rivestreamAgg',
@@ -15,13 +15,13 @@ export const DEFAULT_SOURCE_PRIORITY: StreamingSource[] = [
 const VIDSRC_EMBED_BASE = 'https://vidsrc.pm';
 
 export const SOURCES: { id: StreamingSource; name: string; description: string }[] = [
-  { id: 'vidsrcme', name: 'VidSrcMe', description: 'Mirror with custom subs support' },
-  { id: 'vidking', name: 'Vidking', description: 'Multiple servers including 4K' },
-  { id: 'vidsrcto', name: 'VidSrc.to', description: 'Fast streams with subtitles (vidsrc.pm mirror)' },
-  { id: 'vidsync', name: 'Vidsync', description: 'TMDB embeds with auto-next and server picker' },
-  { id: 'rivestream', name: 'RiveStream', description: 'Standard embed with good quality' },
-  { id: 'rivestreamAgg', name: 'RiveStream Agg', description: 'Multi-source aggregator' },
-  { id: 'rivestreamTorrent', name: 'RiveStream BT', description: 'Torrent-based streaming' },
+  { id: 'vidsrcme', name: 'VidLink Pro', description: 'Fast HD/4K player with custom subs & auto-next' },
+  { id: 'vidsrcto', name: 'VidSrc.pm', description: 'Reliable multi-mirror stream with subtitles' },
+  { id: 'vidking', name: 'Videasy 4K', description: 'Clean multi-server player with 4K & episodes' },
+  { id: 'vidsync', name: 'VidFast Pro', description: 'High-speed TMDB embed with server switcher' },
+  { id: 'rivestream', name: 'VidSrc.su', description: 'Direct HLS embed with multi-language audio' },
+  { id: 'rivestreamAgg', name: 'MultiEmbed', description: 'Multi-source VIP aggregator' },
+  { id: 'rivestreamTorrent', name: '2Embed CC', description: 'Backup multi-server embed' },
 ];
 
 type EmbedIds = {
@@ -48,22 +48,22 @@ export function getMovieEmbedUrl(
 ): string {
   const ids: EmbedIds = { tmdbId, imdbId };
   switch (source) {
+    case 'vidsrcme':
+      return `https://vidlink.pro/movie/${tmdbId}?primaryColor=8b5cf6&autoplay=true`;
     case 'vidsrcto':
       return `${VIDSRC_EMBED_BASE}/embed/movie/${vidsrcMediaId(ids)}`;
     case 'vidking':
-      return `https://www.vidking.net/embed/movie/${tmdbId}`;
+      return `https://player.videasy.net/movie/${tmdbId}?color=8b5cf6`;
     case 'vidsync':
-      return `https://vidsync.live/embed/movie/${tmdbId}`;
+      return `https://vidfast.pro/movie/${tmdbId}?autoPlay=true`;
     case 'rivestream':
-      return `https://www.rivestream.app/embed?type=movie&id=${tmdbId}`;
+      return `https://vidsrc.su/embed/movie/${tmdbId}`;
     case 'rivestreamAgg':
-      return `https://www.rivestream.app/embed/agg?type=movie&id=${tmdbId}`;
+      return `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`;
     case 'rivestreamTorrent':
-      return `https://www.rivestream.app/embed/torrent?type=movie&id=${tmdbId}`;
-    case 'vidsrcme':
-      return `https://vidsrc-embed.ru/embed/movie?tmdb=${tmdbId}`;
+      return `https://www.2embed.cc/embed/${tmdbId}`;
     default:
-      return `${VIDSRC_EMBED_BASE}/embed/movie/${vidsrcMediaId(ids)}`;
+      return `https://vidlink.pro/movie/${tmdbId}?primaryColor=8b5cf6&autoplay=true`;
   }
 }
 
@@ -76,44 +76,25 @@ export function getTVEmbedUrl(
 ): string {
   const ids: EmbedIds = { tmdbId, imdbId };
   const mediaId = vidsrcMediaId(ids);
+  const s = season ?? 1;
+  const e = episode ?? 1;
   switch (source) {
-    case 'vidsrcto': {
-      if (season != null && episode != null) {
-        return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}/${episode}`;
-      }
-      if (season != null) return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}`;
-      return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}`;
-    }
-    case 'vidking': {
-      if (season && episode) return `https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}`;
-      return `https://www.vidking.net/embed/tv/${tmdbId}`;
-    }
-    case 'vidsync': {
-      if (season && episode) return `https://vidsync.live/embed/tv/${tmdbId}/${season}/${episode}`;
-      return `https://vidsync.live/embed/tv/${tmdbId}`;
-    }
-    case 'rivestream': {
-      if (season && episode) return `https://www.rivestream.app/embed?type=tv&id=${tmdbId}&season=${season}&episode=${episode}`;
-      return `https://www.rivestream.app/embed?type=tv&id=${tmdbId}`;
-    }
-    case 'rivestreamAgg': {
-      if (season && episode) return `https://www.rivestream.app/embed/agg?type=tv&id=${tmdbId}&season=${season}&episode=${episode}`;
-      return `https://www.rivestream.app/embed/agg?type=tv&id=${tmdbId}`;
-    }
-    case 'rivestreamTorrent': {
-      if (season && episode) return `https://www.rivestream.app/embed/torrent?type=tv&id=${tmdbId}&season=${season}&episode=${episode}`;
-      return `https://www.rivestream.app/embed/torrent?type=tv&id=${tmdbId}`;
-    }
-    case 'vidsrcme': {
-      if (season && episode) return `https://vidsrc-embed.ru/embed/tv?tmdb=${tmdbId}&season=${season}&episode=${episode}`;
-      return `https://vidsrc-embed.ru/embed/tv?tmdb=${tmdbId}`;
-    }
-    default: {
-      if (season != null && episode != null) {
-        return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${season}/${episode}`;
-      }
-      return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}`;
-    }
+    case 'vidsrcme':
+      return `https://vidlink.pro/tv/${tmdbId}/${s}/${e}?primaryColor=8b5cf6&autoplay=true`;
+    case 'vidsrcto':
+      return `${VIDSRC_EMBED_BASE}/embed/tv/${mediaId}/${s}/${e}`;
+    case 'vidking':
+      return `https://player.videasy.net/tv/${tmdbId}/${s}/${e}?color=8b5cf6`;
+    case 'vidsync':
+      return `https://vidfast.pro/tv/${tmdbId}/${s}/${e}?autoPlay=true`;
+    case 'rivestream':
+      return `https://vidsrc.su/embed/tv/${tmdbId}/${s}/${e}`;
+    case 'rivestreamAgg':
+      return `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${s}&e=${e}`;
+    case 'rivestreamTorrent':
+      return `https://www.2embed.cc/embedtv/${tmdbId}&s=${s}&e=${e}`;
+    default:
+      return `https://vidlink.pro/tv/${tmdbId}/${s}/${e}?primaryColor=8b5cf6&autoplay=true`;
   }
 }
 

@@ -284,6 +284,8 @@ function MajorEventCard({ event }: { event: SportsEvent }) {
 
 export default function SportsPage() {
   const [activeTab, setActiveTab] = useState(0);
+  const [channelSearch, setChannelSearch] = useState('');
+  const [visibleCount, setVisibleCount] = useState(24);
   const { favoriteChannels } = useApp();
   const { sportsChannels, channels } = useChannels();
   const {
@@ -297,6 +299,19 @@ export default function SportsPage() {
   } = useSportsEvents();
 
   const dayEvents = eventsForDay(activeTab);
+
+  const filteredSportsChannels = useMemo(() => {
+    const q = channelSearch.trim().toLowerCase();
+    if (!q) return sportsChannels;
+    return sportsChannels.filter(
+      c => c.name.toLowerCase().includes(q) || (c.category && c.category.toLowerCase().includes(q)),
+    );
+  }, [sportsChannels, channelSearch]);
+
+  const visibleSportsChannels = useMemo(
+    () => filteredSportsChannels.slice(0, visibleCount),
+    [filteredSportsChannels, visibleCount],
+  );
 
   const favoriteSportsChannels = useMemo(() => {
     const resolved = resolveFavoriteChannels(favoriteChannels, channels);
@@ -465,15 +480,45 @@ export default function SportsPage() {
 
       {/* Sports channels */}
       <section>
-        <h2 className="text-lg font-bold text-[#f1f1f4] mb-4">Sports Channels</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-[#f1f1f4]">Sports Channels</h2>
+            <span className="text-xs font-semibold text-[#6b7280] tabular-nums">
+              ({filteredSportsChannels.length})
+            </span>
+          </div>
+          {sportsChannels.length > 12 && (
+            <input
+              type="text"
+              value={channelSearch}
+              onChange={e => {
+                setChannelSearch(e.target.value);
+                setVisibleCount(24);
+              }}
+              placeholder="Filter sports channels…"
+              className="h-9 px-3 rounded-lg bg-[#14141f] border border-[rgba(139,92,246,0.2)] text-xs text-[#f1f1f4] placeholder-[#6b7280] outline-none focus:border-[#8b5cf6] w-full sm:w-64"
+            />
+          )}
+        </div>
         <div
           className="grid gap-4"
           style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}
         >
-          {sportsChannels.map(channel => (
+          {visibleSportsChannels.map(channel => (
             <ChannelCard key={channel.id} channel={channel} />
           ))}
         </div>
+        {visibleCount < filteredSportsChannels.length && (
+          <div className="flex justify-center pt-5">
+            <button
+              type="button"
+              onClick={() => setVisibleCount(c => c + 24)}
+              className="px-5 py-2.5 rounded-xl bg-[#1e1e2d] border border-[rgba(139,92,246,0.25)] text-[#f1f1f4] text-xs font-semibold hover:bg-[#2a2a3d] hover:border-[#8b5cf6] transition-colors"
+            >
+              Load More Channels ({filteredSportsChannels.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Major events — Euro, Olympics, knockouts, etc. (no WC duplicates) */}

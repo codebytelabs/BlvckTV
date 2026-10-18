@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { useChannelLogo } from '@/hooks/useChannelLogo';
 import { useSportsEvents } from '@/hooks/useSportsEvents';
 import { resolveFavoriteChannels } from '@/lib/storage';
 import FavoriteChannelButton from '@/components/FavoriteChannelButton';
@@ -34,8 +33,10 @@ function ChannelRow({
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const { logoUrl, loading } = useChannelLogo(channel.name, channel.logo);
+  const [imgFailed, setImgFailed] = useState(false);
   const gradient = getCategoryGradient(channel.category);
+  const rawLogo = channel.logo?.trim() ?? '';
+  const showLogo = Boolean(rawLogo) && !imgFailed;
 
   return (
     <button
@@ -49,12 +50,17 @@ function ChannelRow({
     >
       <div
         className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center overflow-hidden"
-        style={{ background: logoUrl ? '#0a0a0f' : gradient }}
+        style={{ background: showLogo ? '#0a0a0f' : gradient }}
       >
-        {loading ? (
-          <div className="w-4 h-4 rounded skeleton opacity-40" />
-        ) : logoUrl ? (
-          <img src={logoUrl} alt="" className="max-w-[80%] max-h-[70%] object-contain" />
+        {showLogo ? (
+          <img
+            src={rawLogo}
+            alt=""
+            className="max-w-[80%] max-h-[70%] object-contain"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={() => setImgFailed(true)}
+          />
         ) : (
           <Tv size={14} className="text-[#c4b5fd]" />
         )}

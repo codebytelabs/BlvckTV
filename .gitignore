@@ -30,3 +30,8 @@ releases/
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*
+!.env.example
+graphify-out/
+src/graphify-out/

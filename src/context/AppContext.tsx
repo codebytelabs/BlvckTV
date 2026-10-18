@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem, SelectedVideo, FavoriteChannel } from '@/types';
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
+import type { PageType, WatchItem, HistoryItem, ContinueWatchingItem, SelectedVideo, FavoriteChannel, SelectedLiveChannel } from '@/types';
+import { prefetchChannelLogos } from '@/lib/channelLogos';
 import {
   getWatchlist, addToWatchlist as addWL, removeFromWatchlist as removeWL, isInWatchlist as checkWL,
   getHistory, addToHistory as addH,
@@ -18,7 +19,7 @@ interface AppState {
   setSelectedVideo: (v: SelectedVideo | null) => void;
   selectedDetail: { id: number; type: 'movie' | 'tv' } | null;
   setSelectedDetail: (v: AppState['selectedDetail']) => void;
-  selectedChannel: { id: string; name: string; logo: string; streamUrl?: string } | null;
+  selectedChannel: SelectedLiveChannel | null;
   setSelectedChannel: (v: AppState['selectedChannel']) => void;
   watchlist: WatchItem[];
   refreshWatchlist: () => void;
@@ -61,6 +62,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [toast, setToast] = useState<AppState['toast']>(null);
+
+  useEffect(() => {
+    prefetchChannelLogos();
+  }, []);
 
   const refreshWatchlist = useCallback(() => setWatchlist(getWatchlist()), []);
   const refreshFavoriteChannels = useCallback(() => setFavoriteChannels(getFavoriteChannels()), []);

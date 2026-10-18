@@ -1,6 +1,12 @@
+import { readPersistentCache, writePersistentCache } from '@/lib/persistentCache';
+import { platformFetch } from '@/lib/platformHttp';
+import { isNativeApp } from '@/lib/nativePlatform';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+
 const IPTV_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
 const IPTV_LOGOS_URL = 'https://iptv-org.github.io/api/logos.json';
-const CACHE_KEY = 'blvcktv-iptv-logos-v1';
+const CACHE_KEY = 'blvcktv-iptv-logos-v2';
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type IptvChannel = {
   id: string;
@@ -31,6 +37,9 @@ function normalizeChannelName(name: string): string {
 }
 
 function readCachedIndex(): LogoIndex | null {
+  const fromPersistent = readPersistentCache<[string, string][]>(CACHE_KEY);
+  if (fromPersistent) return new Map(fromPersistent);
+
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
@@ -39,6 +48,7 @@ function readCachedIndex(): LogoIndex | null {
       sessionStorage.removeItem(CACHE_KEY);
       return null;
     }
+    writePersistentCache(CACHE_KEY, parsed.entries, CACHE_TTL_MS);
     return new Map(parsed.entries);
   } catch {
     return null;
@@ -46,11 +56,13 @@ function readCachedIndex(): LogoIndex | null {
 }
 
 function writeCachedIndex(index: LogoIndex): void {
+  const entries = [...index.entries()];
+  writePersistentCache(CACHE_KEY, entries, CACHE_TTL_MS);
   try {
     sessionStorage.setItem(
       CACHE_KEY,
       JSON.stringify({
-        entries: [...index.entries()],
+        entries,
         expiresAt: Date.now() + 24 * 60 * 60 * 1000,
       }),
     );
@@ -64,8 +76,12 @@ async function buildLogoIndex(): Promise<LogoIndex> {
   if (cached) return cached;
 
   const [channelsRes, logosRes] = await Promise.all([
-    fetch(IPTV_CHANNELS_URL),
-    fetch(IPTV_LOGOS_URL),
+    isNativeApp()
+      ? platformFetch(IPTV_CHANNELS_URL)
+      : fetchWithTimeout(IPTV_CHANNELS_URL),
+    isNativeApp()
+      ? platformFetch(IPTV_LOGOS_URL)
+      : fetchWithTimeout(IPTV_LOGOS_URL),
   ]);
 
   if (!channelsRes.ok || !logosRes.ok) {
@@ -107,6 +123,11 @@ function loadLogoIndex(): Promise<LogoIndex> {
   return logoIndexPromise;
 }
 
+/** Warm logo index on app start (important on native where sessionStorage is cold). */
+export function prefetchChannelLogos(): void {
+  void loadLogoIndex();
+}
+
 export function resolveChannelLogoUrl(
   channelName: string,
   existingLogo?: string,
@@ -115,12 +136,16 @@ export function resolveChannelLogoUrl(
     return Promise.resolve(existingLogo);
   }
 
+  const dlhdLogo = existingLogo?.startsWith('/') || existingLogo?.includes('logos/')
+    ? existingLogo
+    : '';
+
   return loadLogoIndex().then(index => {
     const normalized = normalizeChannelName(channelName);
-    if (!normalized) return '';
+    if (!normalized) return dlhdLogo;
 
     if (index.has(normalized)) {
-      return index.get(normalized) ?? '';
+      return index.get(normalized) ?? dlhdLogo;
     }
 
     const words = normalized.split(' ').filter(Boolean);
@@ -137,7 +162,7 @@ export function resolveChannelLogoUrl(
       }
     }
 
-    return bestUrl;
+    return bestUrl || dlhdLogo;
   });
 }
 

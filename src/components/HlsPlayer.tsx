@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Maximize, Pause, Play, Volume2, VolumeX } from 'lucide-react';
+import { DLHD_REFERER } from '@/lib/dlhdPlayerUrls';
 
 type HlsPlayerProps = {
   src: string;
   title: string;
   onError?: () => void;
   onReady?: () => void;
+  /** dlhd adds Referer/Origin headers; none for public IPTV m3u8 URLs */
+  headerMode?: 'dlhd' | 'none';
 };
 
 type HlsInstance = {
@@ -26,7 +29,7 @@ declare global {
       new (config?: {
         enableWorker?: boolean;
         lowLatencyMode?: boolean;
-        xhrSetup?: (xhr: XMLHttpRequest) => void;
+        xhrSetup?: (xhr: XMLHttpRequest, url: string) => void;
       }): HlsInstance;
     };
   }
@@ -50,7 +53,7 @@ function loadHlsScript(): Promise<void> {
   return hlsScriptPromise;
 }
 
-export default function HlsPlayer({ src, title, onError, onReady }: HlsPlayerProps) {
+export default function HlsPlayer({ src, title, onError, onReady, headerMode = 'dlhd' }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,8 +98,19 @@ export default function HlsPlayer({ src, title, onError, onReady }: HlsPlayerPro
           const hls = new Hls({
             enableWorker: true,
             lowLatencyMode: true,
-            xhrSetup: (xhr) => {
+            xhrSetup: (xhr, _url) => {
               xhr.withCredentials = false;
+              if (headerMode !== 'dlhd') return;
+              try {
+                xhr.setRequestHeader('Referer', DLHD_REFERER);
+                xhr.setRequestHeader('Origin', 'https://dlhd.pk');
+                xhr.setRequestHeader(
+                  'User-Agent',
+                  'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
+                );
+              } catch {
+                // ignore if headers already sent
+              }
             },
           });
           hlsRef.current = hls;
@@ -146,7 +160,7 @@ export default function HlsPlayer({ src, title, onError, onReady }: HlsPlayerPro
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [src, onError, startPlayback]);
+  }, [src, onError, startPlayback, headerMode]);
 
   const togglePlay = () => {
     const video = videoRef.current;

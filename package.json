@@ -1,12 +1,13 @@
 {
   "name": "blvcktv",
   "private": true,
-  "version": "1.0.2",
+    "version": "1.0.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:android": "yarn build && npx cap sync android",
+    "fetch-channels": "node scripts/fetch-channels.mjs",
+    "build:android": "yarn fetch-channels && yarn build && npx cap sync android",
     "android:open": "npx cap open android",
     "android:apk": "cd android && ./gradlew assembleDebug",
     "android:apk:release": "cd android && ./gradlew assembleRelease",

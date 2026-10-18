@@ -22,6 +22,7 @@ function withAutoplayParam(url: string): string {
 export default function StreamIframe({
   src,
   title,
+  variant = 'vod',
   className = 'w-full h-full border-0',
   onLoad,
   onError,
@@ -47,7 +48,7 @@ export default function StreamIframe({
       {failed && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black text-center px-6 z-10">
           <p className="text-sm text-[#9ca3af]">Stream failed to load.</p>
-          <p className="text-xs text-[#6b7280] mt-1">Try another server from the menu above.</p>
+          <p className="text-xs text-[#6b7280] mt-1">Try another server from the menu below.</p>
         </div>
       )}
 
@@ -58,7 +59,7 @@ export default function StreamIframe({
         title={title}
         className={className}
         allow={EMBED_ALLOW}
-        referrerPolicy="no-referrer"
+        referrerPolicy={variant === 'live' ? 'no-referrer' : 'origin'}
         loading="eager"
         onLoad={() => {
           setLoading(false);
