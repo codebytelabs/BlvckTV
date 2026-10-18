@@ -1,5 +1,10 @@
 #!/bin/sh
 
+if [ -z "$JAVA_HOME" ] && [ -d "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home" ]; then
+  JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"
+  export JAVA_HOME
+fi
+
 #
 # Copyright © 2015-2021 the original authors.
 #

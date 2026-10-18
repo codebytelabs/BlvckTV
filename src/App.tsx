@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { LiveCatalogProvider } from '@/context/LiveCatalogContext';
 import { useStreamGuard } from '@/hooks/useStreamGuard';
+import { useTvRemoteNavigation } from '@/hooks/useTvRemoteNavigation';
 import Sidebar from '@/components/Sidebar';
 import TopBar from '@/components/TopBar';
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -86,6 +87,7 @@ function Toast() {
 function AppInner() {
   const { selectedVideo, selectedChannel, selectedDetail } = useApp();
   useStreamGuard();
+  useTvRemoteNavigation();
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#0a0a0f]">

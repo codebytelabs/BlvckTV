@@ -46,9 +46,18 @@ export default function PosterCard({ item, type, progress, compact, resumeSeason
 
   return (
     <div
-      className="poster-card cursor-pointer group"
+      role="button"
+      tabIndex={0}
+      aria-label={title}
+      className="poster-card cursor-pointer group rounded-[10px] outline-none"
       style={{ width: compact ? 140 : 180 }}
       onClick={handleDetail}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleDetail();
+        }
+      }}
     >
       <div className="relative overflow-hidden rounded-[10px]" style={{ aspectRatio: '2/3' }}>
         <img
@@ -59,15 +68,19 @@ export default function PosterCard({ item, type, progress, compact, resumeSeason
           onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
         />
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,10,15,0.9)] via-[rgba(10,10,15,0.3)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-250 flex flex-col items-center justify-center gap-3">
+        {/* Hover / TV focus overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,10,15,0.9)] via-[rgba(10,10,15,0.3)] to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100 transition-opacity duration-250 flex flex-col items-center justify-center gap-3">
           <button
+            type="button"
+            tabIndex={-1}
             onClick={(e) => { e.stopPropagation(); handlePlay(); }}
             className="w-12 h-12 rounded-full bg-[rgba(255,255,255,0.15)] backdrop-blur-md flex items-center justify-center border border-[rgba(255,255,255,0.2)] hover:scale-110 transition-transform"
           >
             <Play size={20} className="text-white ml-0.5" />
           </button>
           <button
+            type="button"
+            tabIndex={-1}
             onClick={(e) => {
               e.stopPropagation();
               toggleWatchlist({ id: item.id, type, title, poster_path: item.poster_path, addedAt: Date.now() });

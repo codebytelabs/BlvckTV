@@ -106,3 +106,21 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   border: 2px solid #0a0a0f;
 }
+
+/* 10-Foot TV Remote / D-Pad Focus Ring */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 3px solid #8b5cf6 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.35), 0 8px 28px rgba(6, 182, 212, 0.25) !important;
+  z-index: 20;
+}
+
+.poster-card:focus-visible {
+  transform: scale(1.04);
+}
+

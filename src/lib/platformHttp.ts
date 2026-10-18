@@ -8,17 +8,23 @@ const DLHD_HEADERS = {
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 };
 
-function headersToRecord(headers?: RequestInit['headers']): Record<string, string> {
-  if (!headers) return { ...DLHD_HEADERS };
+const IPTV_HEADERS = {
+  Accept: 'application/json, text/plain, */*',
+  'User-Agent': 'IPTVSmartersPro',
+};
+
+function headersToRecord(url: string, headers?: RequestInit['headers']): Record<string, string> {
+  const base = url.includes('dlhd.pk') ? DLHD_HEADERS : IPTV_HEADERS;
+  if (!headers) return { ...base };
   if (headers instanceof Headers) {
-    const out: Record<string, string> = { ...DLHD_HEADERS };
+    const out: Record<string, string> = { ...base };
     headers.forEach((value, key) => { out[key] = value; });
     return out;
   }
   if (Array.isArray(headers)) {
-    return { ...DLHD_HEADERS, ...Object.fromEntries(headers) };
+    return { ...base, ...Object.fromEntries(headers) };
   }
-  return { ...DLHD_HEADERS, ...headers };
+  return { ...base, ...headers };
 }
 
 /** Native HTTP bypasses WebView CORS; web uses timed fetch. */
@@ -28,7 +34,7 @@ export async function platformFetch(
   timeoutMs = 12_000,
 ): Promise<Response> {
   const method = (options.method ?? 'GET').toUpperCase();
-  const headers = headersToRecord(options.headers);
+  const headers = headersToRecord(url, options.headers);
 
   if (Capacitor.isNativePlatform()) {
     const response = await CapacitorHttp.request({
