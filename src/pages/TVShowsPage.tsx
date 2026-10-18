@@ -20,7 +20,7 @@ const DEFAULT_FILTER: FilterState = {
 };
 
 export default function TVShowsPage() {
-  const { searchQuery } = useApp();
+  const { searchQuery, setSearchQuery } = useApp();
   const [shows, setShows] = useState<TVShow[]>([]);
   const [filter, setFilter] = useState<FilterState>(DEFAULT_FILTER);
   const [page, setPage] = useState(1);
@@ -39,7 +39,7 @@ export default function TVShowsPage() {
 
     try {
       const result = searchQuery
-        ? await searchTVShows(searchQuery, pageNum)
+        ? await searchTVShows(searchQuery, pageNum, filter.sortBy)
         : await queryTVCatalog(filter, genreId, pageNum);
 
       setShows(prev => append ? [...prev, ...result.results] : result.results);
@@ -68,24 +68,41 @@ export default function TVShowsPage() {
   const canLoadMore = page < totalPages && !loading && !loadingMore;
 
   return (
-    <div className="space-y-6 pb-10 page-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-[#f1f1f4]">TV Shows</h1>
-        {!loading && !searchQuery && (
+    <div className="space-y-5 pb-10 page-fade-in">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-extrabold text-[#f1f1f4]">TV Shows</h1>
+          {searchQuery && (
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[rgba(139,92,246,0.18)] border border-[rgba(139,92,246,0.3)] text-xs font-semibold text-[#c4b5fd]">
+              Search: &ldquo;{searchQuery}&rdquo;
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="ml-1 text-white hover:text-[#06b6d4]"
+              >
+                &times;
+              </button>
+            </span>
+          )}
+        </div>
+        {!loading && (
           <span className="text-xs text-[#6b7280] tabular-nums">
             Page {page} of {totalPages}
           </span>
         )}
       </div>
 
-      {!searchQuery && (
-        <CatalogFilterBar
-          type="tv"
-          filter={filter}
-          onChange={setFilter}
-          totalResults={loading ? undefined : totalResults}
-        />
-      )}
+      <CatalogFilterBar
+        type="tv"
+        filter={filter}
+        onChange={(next) => {
+          if (searchQuery && next.mode !== filter.mode) {
+            setSearchQuery('');
+          }
+          setFilter(next);
+        }}
+        totalResults={loading ? undefined : totalResults}
+      />
 
       {loading && shows.length === 0 ? (
         <PosterGridSkeleton />

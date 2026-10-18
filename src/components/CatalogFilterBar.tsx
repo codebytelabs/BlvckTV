@@ -63,6 +63,7 @@ function countActiveFilters(filter: FilterState): number {
   if (filter.yearTo) n++;
   if (filter.ratingMin > 0) n++;
   if (filter.country) n++;
+  if (filter.sortBy !== 'popularity') n++;
   return n;
 }
 
@@ -79,14 +80,29 @@ function FilterFields({
 }) {
   const genreIds = type === 'movie' ? MOVIE_GENRE_IDS : TV_GENRE_IDS;
   const fieldClass = stacked
-    ? 'w-full bg-[#1e1e2d] border border-[rgba(139,92,246,0.15)] text-[#f1f1f4] text-sm rounded-xl px-4 py-3 outline-none focus:border-[#8b5cf6]'
-    : 'bg-[#1e1e2d] border border-[rgba(139,92,246,0.15)] text-[#f1f1f4] text-xs rounded-lg px-3 py-2 outline-none focus:border-[#8b5cf6] min-w-[120px]';
+    ? 'w-full bg-[#1e1e2d] border border-[rgba(139,92,246,0.2)] text-[#f1f1f4] text-sm rounded-xl px-4 py-3 outline-none focus:border-[#8b5cf6]'
+    : 'bg-[#1e1e2d] border border-[rgba(139,92,246,0.2)] text-[#f1f1f4] text-xs font-medium rounded-lg px-3 py-2 min-h-[38px] outline-none focus:border-[#8b5cf6] shrink-0';
 
   return (
     <>
-      <label className={stacked ? 'block space-y-1.5' : undefined}>
+      <label className={stacked ? 'block space-y-1.5' : 'shrink-0'}>
+        {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Sort by</span>}
+        <select
+          aria-label="Sort by"
+          value={filter.sortBy}
+          onChange={(e) => onChange({ ...filter, sortBy: e.target.value as FilterState['sortBy'] })}
+          className={fieldClass}
+        >
+          {SORT_OPTIONS.map(s => (
+            <option key={s.value} value={s.value}>Sort: {s.label}</option>
+          ))}
+        </select>
+      </label>
+
+      <label className={stacked ? 'block space-y-1.5' : 'shrink-0'}>
         {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Genre</span>}
         <select
+          aria-label="Genre"
           value={filter.genre}
           onChange={(e) => onChange({ ...filter, genre: e.target.value })}
           className={fieldClass}
@@ -98,45 +114,59 @@ function FilterFields({
         </select>
       </label>
 
-      <div className={stacked ? 'grid grid-cols-2 gap-3' : 'contents'}>
-        <label className={stacked ? 'block space-y-1.5' : undefined}>
+      <label className={stacked ? 'block space-y-1.5' : 'shrink-0'}>
+        {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Country</span>}
+        <select
+          aria-label="Country"
+          value={filter.country}
+          onChange={(e) => onChange({ ...filter, country: e.target.value })}
+          className={fieldClass}
+        >
+          {COUNTRY_OPTIONS.map(c => (
+            <option key={c.code || 'all'} value={c.code}>{c.label}</option>
+          ))}
+        </select>
+      </label>
+
+      <div className={stacked ? 'grid grid-cols-2 gap-3' : 'flex items-center gap-2 shrink-0'}>
+        <label className={stacked ? 'block space-y-1.5' : 'shrink-0'}>
           {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Year from</span>}
           <input
             type="number"
-            placeholder="From"
+            placeholder="Year From"
             inputMode="numeric"
             value={filter.yearFrom}
             onChange={(e) => onChange({ ...filter, yearFrom: e.target.value })}
             min="1900"
             max="2030"
-            className={stacked ? fieldClass : `${fieldClass} w-20`}
+            className={stacked ? fieldClass : `${fieldClass} w-24`}
           />
         </label>
-        <label className={stacked ? 'block space-y-1.5' : undefined}>
+        <label className={stacked ? 'block space-y-1.5' : 'shrink-0'}>
           {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Year to</span>}
           <input
             type="number"
-            placeholder="To"
+            placeholder="Year To"
             inputMode="numeric"
             value={filter.yearTo}
             onChange={(e) => onChange({ ...filter, yearTo: e.target.value })}
             min="1900"
             max="2030"
-            className={stacked ? fieldClass : `${fieldClass} w-20`}
+            className={stacked ? fieldClass : `${fieldClass} w-24`}
           />
         </label>
       </div>
 
-      <label className={stacked ? 'block space-y-2' : 'flex items-center gap-2'}>
+      <label className={stacked ? 'block space-y-2' : 'flex items-center gap-2 bg-[#1e1e2d] border border-[rgba(139,92,246,0.2)] rounded-lg px-3 py-1.5 min-h-[38px] shrink-0'}>
         {stacked ? (
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-[#9ca3af]">Minimum rating</span>
-            <span className="text-sm font-bold text-[#f1f1f4] tabular-nums">{filter.ratingMin || '0'}</span>
+            <span className="text-sm font-bold text-[#f1f1f4] tabular-nums">{filter.ratingMin || '0'}+</span>
           </div>
         ) : (
           <>
-            <span className="text-xs text-[#6b7280] hidden sm:inline">Rating</span>
-            <span className="text-xs text-[#f1f1f4] w-6 tabular-nums">{filter.ratingMin || '0'}</span>
+            <span className="text-xs text-[#9ca3af]">Rating</span>
+            <span className="text-xs font-bold text-[#f59e0b] w-7 tabular-nums">★{filter.ratingMin || '0'}</span>
           </>
         )}
         <input
@@ -148,32 +178,6 @@ function FilterFields({
           onChange={(e) => onChange({ ...filter, ratingMin: Number(e.target.value) })}
           className={stacked ? 'w-full accent-[#8b5cf6] h-2' : 'w-20 sm:w-24 accent-[#8b5cf6]'}
         />
-      </label>
-
-      <label className={stacked ? 'block space-y-1.5' : undefined}>
-        {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Country</span>}
-        <select
-          value={filter.country}
-          onChange={(e) => onChange({ ...filter, country: e.target.value })}
-          className={fieldClass}
-        >
-          {COUNTRY_OPTIONS.map(c => (
-            <option key={c.code || 'all'} value={c.code}>{c.label}</option>
-          ))}
-        </select>
-      </label>
-
-      <label className={stacked ? 'block space-y-1.5' : undefined}>
-        {stacked && <span className="text-xs font-semibold text-[#9ca3af]">Sort by</span>}
-        <select
-          value={filter.sortBy}
-          onChange={(e) => onChange({ ...filter, sortBy: e.target.value as FilterState['sortBy'] })}
-          className={fieldClass}
-        >
-          {SORT_OPTIONS.map(s => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
       </label>
     </>
   );
@@ -224,7 +228,7 @@ export default function CatalogFilterBar({ type, filter, onChange, totalResults 
             className={`touch-target shrink-0 snap-start px-4 py-2.5 rounded-full text-xs font-bold transition-colors min-h-[40px] ${
               filter.mode === mode.id
                 ? 'bg-[#8b5cf6] text-white shadow-[0_0_12px_rgba(139,92,246,0.35)]'
-                : 'bg-[#1e1e2d] text-[#9ca3af] active:bg-[#2a2a3d] active:text-[#f1f1f4]'
+                : 'bg-[#1e1e2d] text-[#9ca3af] hover:text-[#f1f1f4] active:bg-[#2a2a3d]'
             }`}
           >
             {mode.label}
@@ -232,49 +236,42 @@ export default function CatalogFilterBar({ type, filter, onChange, totalResults 
         ))}
       </div>
 
-      {isMobile ? (
-        <div className="flex items-center gap-2">
+      {/* Inline Sort & Filter bar — always visible on both Web and Android (scrollable on compact screens) */}
+      <div className="flex items-center sm:flex-wrap gap-2 sm:gap-3 p-2.5 sm:p-3.5 rounded-xl bg-[#14141f] border border-[rgba(139,92,246,0.15)] overflow-x-auto hide-scrollbar">
+        <FilterFields type={type} filter={filter} onChange={onChange} />
+
+        {isMobile && (
           <button
             type="button"
             onClick={openSheet}
-            className="touch-target flex flex-1 items-center justify-center gap-2 min-h-[44px] rounded-xl bg-[#14141f] border border-[rgba(139,92,246,0.2)] text-sm font-semibold text-[#f1f1f4]"
+            className="touch-target shrink-0 flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-lg bg-[#1e1e2d] border border-[rgba(139,92,246,0.25)] text-xs font-semibold text-[#f1f1f4]"
           >
-            <SlidersHorizontal size={16} className="text-[#8b5cf6]" />
-            Filters & Sort
+            <SlidersHorizontal size={14} className="text-[#8b5cf6]" />
+            All Filters
             {activeCount > 0 && (
-              <span className="rounded-full bg-[#8b5cf6] px-2 py-0.5 text-[10px] font-bold text-white tabular-nums">
+              <span className="rounded-full bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-bold text-white tabular-nums">
                 {activeCount}
               </span>
             )}
           </button>
+        )}
 
-          {totalResults !== undefined && (
-            <span className="shrink-0 text-xs text-[#6b7280] tabular-nums px-1">
-              {totalResults.toLocaleString()}
-            </span>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-[#14141f] border border-[rgba(139,92,246,0.15)]">
-          <FilterFields type={type} filter={filter} onChange={onChange} />
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="shrink-0 text-xs text-[#8b5cf6] hover:text-[#06b6d4] font-semibold px-2 py-1"
+          >
+            Reset
+          </button>
+        )}
 
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="text-xs text-[#8b5cf6] hover:text-[#06b6d4] font-semibold ml-auto"
-            >
-              Clear filters
-            </button>
-          )}
-
-          {totalResults !== undefined && (
-            <span className="text-xs text-[#6b7280] ml-auto tabular-nums">
-              {totalResults.toLocaleString()} titles
-            </span>
-          )}
-        </div>
-      )}
+        {totalResults !== undefined && (
+          <span className="shrink-0 text-xs text-[#6b7280] ml-auto tabular-nums px-1">
+            {totalResults.toLocaleString()} titles
+          </span>
+        )}
+      </div>
 
       {/* Active chips */}
       {hasActiveFilters && (

@@ -9,40 +9,45 @@ import type {
   MovieCatalogMode,
   TVCatalogMode,
 } from '@/types';
-import { FALLBACK_MOVIES, FALLBACK_TV, isTmdbKeyConfigured } from '@/lib/catalogFallback';
+import { FALLBACK_MOVIES, FALLBACK_TV, getTmdbApiKey, isTmdbKeyConfigured } from '@/lib/catalogFallback';
 
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const TMDB_API_KEY = getTmdbApiKey();
 const TMDB_DIRECT_BASE = 'https://api.themoviedb.org/3';
 const TMDB_DEV_PROXY = '/api/tmdb';
 export const IMG_BASE = 'https://image.tmdb.org/t/p';
 
-function buildTMDBUrl(endpoint: string): string {
+function appendKey(endpoint: string): string {
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const separator = path.includes('?') ? '&' : '?';
-  const pathWithKey = `${path}${separator}api_key=${TMDB_API_KEY}`;
-
-  if (import.meta.env.DEV) {
-    return `${TMDB_DEV_PROXY}${pathWithKey}`;
-  }
-
-  return `${TMDB_DIRECT_BASE}${pathWithKey}`;
+  return `${path}${separator}api_key=${TMDB_API_KEY}`;
 }
 
 async function fetchTMDB<T>(endpoint: string): Promise<T> {
-  if (!TMDB_API_KEY || TMDB_API_KEY === 'your_tmdb_api_key_here') {
-    throw new Error(
-      'TMDB API key missing. Add VITE_TMDB_API_KEY to your .env file (get a free key at themoviedb.org).',
-    );
+  if (!TMDB_API_KEY) {
+    throw new Error('TMDB API key missing.');
   }
 
-  const res = await fetch(buildTMDBUrl(endpoint));
-  if (!res.ok) {
-    if (res.status === 401) {
-      throw new Error('TMDB authentication failed. Check that VITE_TMDB_API_KEY is valid.');
+  const pathWithKey = appendKey(endpoint);
+  const urls = import.meta.env.DEV
+    ? [`${TMDB_DEV_PROXY}${pathWithKey}`, `${TMDB_DIRECT_BASE}${pathWithKey}`]
+    : [`${TMDB_DIRECT_BASE}${pathWithKey}`, `${TMDB_DEV_PROXY}${pathWithKey}`];
+
+  let lastError: Error | null = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error('TMDB authentication failed. Check that VITE_TMDB_API_KEY is valid.');
+        }
+        throw new Error(`TMDB Error: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error('TMDB request failed');
     }
-    throw new Error(`TMDB Error: ${res.status}`);
   }
-  return res.json();
+  throw lastError ?? new Error('TMDB request failed');
 }
 
 type TMDBPage<T> = { results: T[]; page: number; total_pages: number; total_results: number };
@@ -51,7 +56,7 @@ const MOVIE_SORT: Record<FilterState['sortBy'], string> = {
   popularity: 'popularity.desc',
   newest: 'primary_release_date.desc',
   rating: 'vote_average.desc',
-  az: 'title.asc',
+  az: 'original_title.asc',
 };
 
 const TV_SORT: Record<FilterState['sortBy'], string> = {
@@ -61,6 +66,56 @@ const TV_SORT: Record<FilterState['sortBy'], string> = {
   az: 'name.asc',
 };
 
+export function sortMovies(items: Movie[], sortBy: FilterState['sortBy']): Movie[] {
+  const copy = [...items];
+  switch (sortBy) {
+    case 'newest':
+      return copy.sort((a, b) => {
+        const hasA = a.poster_path ? 1 : 0;
+        const hasB = b.poster_path ? 1 : 0;
+        if (hasA !== hasB) return hasB - hasA;
+        return (b.release_date || '').localeCompare(a.release_date || '');
+      });
+    case 'rating':
+      return copy.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    case 'az':
+      return copy.sort((a, b) => {
+        const hasA = a.poster_path ? 1 : 0;
+        const hasB = b.poster_path ? 1 : 0;
+        if (hasA !== hasB) return hasB - hasA;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+    case 'popularity':
+    default:
+      return copy;
+  }
+}
+
+export function sortTVShows(items: TVShow[], sortBy: FilterState['sortBy']): TVShow[] {
+  const copy = [...items];
+  switch (sortBy) {
+    case 'newest':
+      return copy.sort((a, b) => {
+        const hasA = a.poster_path ? 1 : 0;
+        const hasB = b.poster_path ? 1 : 0;
+        if (hasA !== hasB) return hasB - hasA;
+        return (b.first_air_date || '').localeCompare(a.first_air_date || '');
+      });
+    case 'rating':
+      return copy.sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+    case 'az':
+      return copy.sort((a, b) => {
+        const hasA = a.poster_path ? 1 : 0;
+        const hasB = b.poster_path ? 1 : 0;
+        if (hasA !== hasB) return hasB - hasA;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    case 'popularity':
+    default:
+      return copy;
+  }
+}
+
 function buildDiscoverParams(
   type: 'movie' | 'tv',
   filter: FilterState,
@@ -68,26 +123,52 @@ function buildDiscoverParams(
   page: number,
 ): string | null {
   const hasFilters = Boolean(
-    genreId || filter.yearFrom || filter.yearTo || filter.ratingMin > 0 || filter.country,
+    genreId ||
+    filter.yearFrom ||
+    filter.yearTo ||
+    filter.ratingMin > 0 ||
+    filter.country ||
+    filter.sortBy !== 'popularity',
   );
   if (!hasFilters) return null;
 
+  const effectiveSort =
+    filter.sortBy === 'popularity' && filter.mode === 'top_rated'
+      ? 'rating'
+      : filter.sortBy;
+
   const params = new URLSearchParams({
     language: 'en-US',
+    include_adult: 'false',
     page: String(page),
-    sort_by: type === 'movie' ? MOVIE_SORT[filter.sortBy] : TV_SORT[filter.sortBy],
+    sort_by: type === 'movie' ? MOVIE_SORT[effectiveSort] : TV_SORT[effectiveSort],
   });
+
+  if (effectiveSort === 'rating' || filter.mode === 'top_rated') {
+    params.set('vote_count.gte', '50');
+  } else if (effectiveSort === 'newest' || effectiveSort === 'az') {
+    params.set('vote_count.gte', '5');
+  }
 
   if (genreId) params.set('with_genres', String(genreId));
   if (filter.ratingMin > 0) params.set('vote_average.gte', String(filter.ratingMin));
   if (filter.country) params.set('with_origin_country', filter.country.toUpperCase());
 
+  const today = new Date().toISOString().slice(0, 10);
+
   if (type === 'movie') {
     if (filter.yearFrom) params.set('primary_release_date.gte', `${filter.yearFrom}-01-01`);
+    else if (filter.mode === 'upcoming') params.set('primary_release_date.gte', today);
     if (filter.yearTo) params.set('primary_release_date.lte', `${filter.yearTo}-12-31`);
+    else if (effectiveSort === 'newest' && filter.mode !== 'upcoming') {
+      params.set('primary_release_date.lte', today);
+    }
   } else {
     if (filter.yearFrom) params.set('first_air_date.gte', `${filter.yearFrom}-01-01`);
     if (filter.yearTo) params.set('first_air_date.lte', `${filter.yearTo}-12-31`);
+    else if (effectiveSort === 'newest') {
+      params.set('first_air_date.lte', today);
+    }
   }
 
   return `/discover/${type}?${params}`;
@@ -113,6 +194,48 @@ function tvListEndpoint(mode: TVCatalogMode, page: number): string {
   }
 }
 
+function filterFallbackMoviesCatalog(filter: FilterState, genreId?: number): Movie[] {
+  let list = [...FALLBACK_MOVIES];
+  if (genreId) list = list.filter(m => m.genre_ids.includes(genreId));
+  if (filter.ratingMin > 0) list = list.filter(m => m.vote_average >= filter.ratingMin);
+  if (filter.yearFrom) {
+    const from = Number(filter.yearFrom);
+    if (!Number.isNaN(from)) list = list.filter(m => Number(m.release_date?.slice(0, 4) || 0) >= from);
+  }
+  if (filter.yearTo) {
+    const to = Number(filter.yearTo);
+    if (!Number.isNaN(to)) list = list.filter(m => Number(m.release_date?.slice(0, 4) || 9999) <= to);
+  }
+  const effectiveSort =
+    filter.sortBy === 'popularity' && filter.mode === 'top_rated'
+      ? 'rating'
+      : filter.sortBy === 'popularity' && (filter.mode === 'now_playing' || filter.mode === 'upcoming')
+        ? 'newest'
+        : filter.sortBy;
+  return sortMovies(list, effectiveSort);
+}
+
+function filterFallbackTVCatalog(filter: FilterState, genreId?: number): TVShow[] {
+  let list = [...FALLBACK_TV];
+  if (genreId) list = list.filter(t => t.genre_ids.includes(genreId));
+  if (filter.ratingMin > 0) list = list.filter(t => t.vote_average >= filter.ratingMin);
+  if (filter.yearFrom) {
+    const from = Number(filter.yearFrom);
+    if (!Number.isNaN(from)) list = list.filter(t => Number(t.first_air_date?.slice(0, 4) || 0) >= from);
+  }
+  if (filter.yearTo) {
+    const to = Number(filter.yearTo);
+    if (!Number.isNaN(to)) list = list.filter(t => Number(t.first_air_date?.slice(0, 4) || 9999) <= to);
+  }
+  const effectiveSort =
+    filter.sortBy === 'popularity' && filter.mode === 'top_rated'
+      ? 'rating'
+      : filter.sortBy === 'popularity' && (filter.mode === 'on_air' || filter.mode === 'airing_today')
+        ? 'newest'
+        : filter.sortBy;
+  return sortTVShows(list, effectiveSort);
+}
+
 export async function queryMovieCatalog(
   filter: FilterState,
   genreId: number | undefined,
@@ -122,15 +245,17 @@ export async function queryMovieCatalog(
     const discover = buildDiscoverParams('movie', filter, genreId, page);
     const endpoint = discover ?? movieListEndpoint(filter.mode as MovieCatalogMode, page);
     const data = await fetchTMDB<TMDBPage<Movie>>(endpoint);
+    const sorted = sortMovies(data.results, filter.sortBy);
     return {
-      results: data.results,
+      results: sorted,
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
     };
   } catch {
-    const slice = FALLBACK_MOVIES.slice((page - 1) * 20, page * 20);
-    return { results: slice, page, totalPages: 1, totalResults: FALLBACK_MOVIES.length };
+    const filtered = filterFallbackMoviesCatalog(filter, genreId);
+    const slice = filtered.slice((page - 1) * 20, page * 20);
+    return { results: slice, page, totalPages: 1, totalResults: filtered.length };
   }
 }
 
@@ -143,50 +268,66 @@ export async function queryTVCatalog(
     const discover = buildDiscoverParams('tv', filter, genreId, page);
     const endpoint = discover ?? tvListEndpoint(filter.mode as TVCatalogMode, page);
     const data = await fetchTMDB<TMDBPage<TVShow>>(endpoint);
+    const sorted = sortTVShows(data.results, filter.sortBy);
     return {
-      results: data.results,
+      results: sorted,
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
     };
   } catch {
-    const slice = FALLBACK_TV.slice((page - 1) * 20, page * 20);
-    return { results: slice, page, totalPages: 1, totalResults: FALLBACK_TV.length };
+    const filtered = filterFallbackTVCatalog(filter, genreId);
+    const slice = filtered.slice((page - 1) * 20, page * 20);
+    return { results: slice, page, totalPages: 1, totalResults: filtered.length };
   }
 }
 
-export async function searchMovies(query: string, page = 1): Promise<PaginatedResult<Movie>> {
+export async function searchMovies(
+  query: string,
+  page = 1,
+  sortBy: FilterState['sortBy'] = 'popularity',
+): Promise<PaginatedResult<Movie>> {
   try {
     const data = await fetchTMDB<TMDBPage<Movie>>(
       `/search/movie?query=${encodeURIComponent(query)}&language=en-US&page=${page}`,
     );
     return {
-      results: data.results,
+      results: sortMovies(data.results, sortBy),
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
     };
   } catch {
     const q = query.toLowerCase();
-    const filtered = FALLBACK_MOVIES.filter(m => m.title.toLowerCase().includes(q));
+    const filtered = sortMovies(
+      FALLBACK_MOVIES.filter(m => m.title.toLowerCase().includes(q)),
+      sortBy,
+    );
     return { results: filtered, page: 1, totalPages: 1, totalResults: filtered.length };
   }
 }
 
-export async function searchTVShows(query: string, page = 1): Promise<PaginatedResult<TVShow>> {
+export async function searchTVShows(
+  query: string,
+  page = 1,
+  sortBy: FilterState['sortBy'] = 'popularity',
+): Promise<PaginatedResult<TVShow>> {
   try {
     const data = await fetchTMDB<TMDBPage<TVShow>>(
       `/search/tv?query=${encodeURIComponent(query)}&language=en-US&page=${page}`,
     );
     return {
-      results: data.results,
+      results: sortTVShows(data.results, sortBy),
       page: data.page,
       totalPages: data.total_pages,
       totalResults: data.total_results,
     };
   } catch {
     const q = query.toLowerCase();
-    const filtered = FALLBACK_TV.filter(t => t.name.toLowerCase().includes(q));
+    const filtered = sortTVShows(
+      FALLBACK_TV.filter(t => t.name.toLowerCase().includes(q)),
+      sortBy,
+    );
     return { results: filtered, page: 1, totalPages: 1, totalResults: filtered.length };
   }
 }

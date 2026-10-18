@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { getPoster } from '@/hooks/useTMDB';
-import { Play, Plus, Check, Star } from 'lucide-react';
+import { getPoster, getGenreName } from '@/hooks/useTMDB';
+import { Play, Plus, Check, Star, Film, Tv } from 'lucide-react';
 import type { Movie, TVShow } from '@/types';
 
 interface PosterCardProps {
@@ -14,11 +15,16 @@ interface PosterCardProps {
 
 export default function PosterCard({ item, type, progress, compact, resumeSeason, resumeEpisode }: PosterCardProps) {
   const { isWatchlisted, toggleWatchlist, setSelectedDetail, setSelectedVideo, addHistory } = useApp();
+  const [imgSize, setImgSize] = useState<'w342' | 'w500'>('w342');
+  const [imgFailed, setImgFailed] = useState(false);
+
   const title = type === 'movie' ? (item as Movie).title : (item as TVShow).name;
   const year = type === 'movie'
     ? (item as Movie).release_date?.substring(0, 4)
     : (item as TVShow).first_air_date?.substring(0, 4);
+  const primaryGenre = item.genre_ids?.[0] ? getGenreName(item.genre_ids[0]) : '';
   const watchlisted = isWatchlisted(item.id, type);
+  const showFallback = !item.poster_path || imgFailed;
 
   const handlePlay = () => {
     setSelectedVideo({
@@ -49,8 +55,8 @@ export default function PosterCard({ item, type, progress, compact, resumeSeason
       role="button"
       tabIndex={0}
       aria-label={title}
-      className="poster-card cursor-pointer group rounded-[10px] outline-none"
-      style={{ width: compact ? 140 : 180 }}
+      className="poster-card w-full cursor-pointer group rounded-[10px] outline-none"
+      style={compact ? { width: 140 } : undefined}
       onClick={handleDetail}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -59,14 +65,45 @@ export default function PosterCard({ item, type, progress, compact, resumeSeason
         }
       }}
     >
-      <div className="relative overflow-hidden rounded-[10px]" style={{ aspectRatio: '2/3' }}>
-        <img
-          src={getPoster(item.poster_path)}
-          alt={title}
-          loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-400"
-          onError={(e) => { (e.target as HTMLImageElement).src = '/logo.png'; }}
-        />
+      <div className="relative overflow-hidden rounded-[10px] bg-[#14141f] border border-[rgba(139,92,246,0.12)]" style={{ aspectRatio: '2/3' }}>
+        {!showFallback ? (
+          <img
+            src={getPoster(item.poster_path, imgSize)}
+            alt={title}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-400"
+            onError={() => {
+              if (imgSize === 'w342') {
+                setImgSize('w500');
+              } else {
+                setImgFailed(true);
+              }
+            }}
+          />
+        ) : (
+          <div
+            className="w-full h-full flex flex-col items-center justify-between p-4 text-center select-none"
+            style={{
+              background: 'radial-gradient(circle at 50% 25%, rgba(139,92,246,0.28), rgba(15,15,24,0.98) 75%)',
+            }}
+          >
+            <div className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#9ca3af]">
+              <span>{type === 'movie' ? 'Movie' : 'Series'}</span>
+              {year && <span>{year}</span>}
+            </div>
+            <div className="flex flex-col items-center gap-2.5 my-auto px-1">
+              <div className="w-12 h-12 rounded-2xl bg-[rgba(139,92,246,0.15)] border border-[rgba(139,92,246,0.3)] flex items-center justify-center text-[#a78bfa]">
+                {type === 'movie' ? <Film size={22} /> : <Tv size={22} />}
+              </div>
+              <p className="text-xs sm:text-sm font-bold text-[#f1f1f4] line-clamp-3 leading-snug">
+                {title}
+              </p>
+            </div>
+            <div className="w-full text-[10px] font-medium text-[#6b7280] truncate">
+              {primaryGenre || 'BlvckTV'}
+            </div>
+          </div>
+        )}
 
         {/* Hover / TV focus overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[rgba(10,10,15,0.9)] via-[rgba(10,10,15,0.3)] to-transparent opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100 transition-opacity duration-250 flex flex-col items-center justify-center gap-3">
@@ -119,6 +156,7 @@ export default function PosterCard({ item, type, progress, compact, resumeSeason
         <h3 className="text-[13px] font-semibold text-[#f1f1f4] truncate">{title}</h3>
         <div className="flex items-center gap-2 mt-0.5">
           {year && <span className="text-[11px] text-[#6b7280]">{year}</span>}
+          {primaryGenre && <span className="text-[11px] text-[#6b7280] truncate">• {primaryGenre}</span>}
         </div>
       </div>
     </div>

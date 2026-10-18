@@ -44,6 +44,21 @@ export default function HomePage() {
   const hasContent = trendingMovies.length > 0 || trendingTV.length > 0 || popularMovies.length > 0;
   const showError = error && !hasContent && !initialLoading;
 
+  const featuredLiveChannels = (() => {
+    const withLogos = liveChannels.filter(
+      ch =>
+        ch.logo &&
+        ch.logo.startsWith('http') &&
+        !/movie\s*\d+/i.test(ch.name) &&
+        !ch.name.includes('**'),
+    );
+    const base = withLogos.length >= 12 ? withLogos : [
+      ...withLogos,
+      ...liveChannels.filter(ch => !withLogos.includes(ch)),
+    ];
+    return base.slice(0, 16);
+  })();
+
   if (showError) {
     return (
       <div className="pb-10">
@@ -101,8 +116,8 @@ export default function HomePage() {
             ))}
           </Carousel>
 
-      <Carousel title="Live Now" action={{ label: 'Browse All', onClick: () => setCurrentPage('livetv') }}>
-        {liveChannels.slice(0, 12).map(channel => (
+          <Carousel title="Live Now" action={{ label: 'Browse All', onClick: () => setCurrentPage('livetv') }}>
+            {featuredLiveChannels.map(channel => (
               <div key={channel.id} className="carousel-item" style={{ width: 180 }}>
                 <ChannelCard channel={channel} />
               </div>

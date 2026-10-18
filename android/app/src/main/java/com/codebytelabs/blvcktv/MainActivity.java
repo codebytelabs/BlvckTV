@@ -333,7 +333,42 @@ public class MainActivity extends BridgeActivity {
                 }
             }
 
+            if (path != null && path.startsWith("/api/tmdb/")) {
+                if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+                    return new WebResourceResponse("text/plain", "UTF-8", 204, "No Content", corsHeaders(), new ByteArrayInputStream(new byte[0]));
+                }
+                return handleTmdbProxy(uri, path);
+            }
+
             return super.shouldInterceptRequest(view, request);
+        }
+
+        private WebResourceResponse handleTmdbProxy(Uri uri, String path) {
+            String subPath = path.substring("/api/tmdb".length());
+            String query = uri.getEncodedQuery();
+            String target = "https://api.themoviedb.org/3" + subPath + (query != null && !query.isEmpty() ? "?" + query : "");
+            try {
+                ResolvedConnection rc = openWithRedirects(
+                    target,
+                    "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
+                    10000,
+                    15000
+                );
+                if (rc.status >= 400) {
+                    rc.conn.disconnect();
+                    return jsonResponse(rc.status, "TMDB Error", "{\"results\":[]}");
+                }
+                return new WebResourceResponse(
+                    "application/json",
+                    "UTF-8",
+                    200,
+                    "OK",
+                    corsHeaders(),
+                    new BufferedInputStream(rc.conn.getInputStream(), 16384)
+                );
+            } catch (Exception e) {
+                return jsonResponse(502, "Bad Gateway", "{\"results\":[]}");
+            }
         }
 
         private WebResourceResponse handleM3uPlaylist(Uri uri) {
