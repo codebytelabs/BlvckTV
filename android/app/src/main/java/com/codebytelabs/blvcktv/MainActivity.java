@@ -46,14 +46,6 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
 
-            if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
-                webView.evaluateJavascript(
-                    "(function(){ var a = document.activeElement; if (a && typeof a.click === 'function') { a.click(); } })();",
-                    null
-                );
-                return true;
-            }
-
             if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || keyCode == KeyEvent.KEYCODE_MEDIA_PLAY || keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
                 webView.evaluateJavascript(
                     "(function(){ var v = document.querySelector('video'); if (v) { if (v.paused) v.play(); else v.pause(); } })();",
@@ -64,7 +56,7 @@ public class MainActivity extends BridgeActivity {
 
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 webView.evaluateJavascript(
-                    "(function(){ var ev = new CustomEvent('blvcktv:tv-back', { cancelable: true }); return !window.dispatchEvent(ev); })()",
+                    "(function(){ if (typeof window.__blvcktvHandleBack === 'function' && window.__blvcktvHandleBack()) return true; var ev = new CustomEvent('blvcktv:tv-back', { cancelable: true }); return !window.dispatchEvent(ev); })()",
                     value -> {
                         if (!"true".equals(value)) {
                             runOnUiThread(MainActivity.super::onBackPressed);

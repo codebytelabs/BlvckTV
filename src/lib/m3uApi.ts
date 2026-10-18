@@ -13,24 +13,47 @@ import {
   type StreamHealthStatus,
 } from '@/lib/customPlaylists';
 import { readPersistentCache, writePersistentCache, removePersistentCache } from '@/lib/persistentCache';
-import { useLiveApiProxy } from '@/lib/liveApiProxy';
+import { getApiBaseUrl, useLiveApiProxy } from '@/lib/liveApiProxy';
+import { isNativeApp } from '@/lib/nativePlatform';
 import { platformFetchText } from '@/lib/platformHttp';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_PERSISTENT_CACHE_CHANNELS = 1500;
 const cacheKey = (id: string) => `blvcktv_m3u_v3_${id}`;
+const memoryChannelCache = new Map<string, Channel[]>();
+
+function saveChannelsCache(id: string, channels: Channel[]): void {
+  const key = cacheKey(id);
+  memoryChannelCache.set(key, channels);
+  if (channels.length <= MAX_PERSISTENT_CACHE_CHANNELS) {
+    writePersistentCache(key, channels, CACHE_TTL_MS);
+  }
+}
+
+function loadChannelsCache(id: string): Channel[] | null {
+  const key = cacheKey(id);
+  const mem = memoryChannelCache.get(key);
+  if (mem && mem.length > 0) return mem;
+  const disk = readPersistentCache<Channel[]>(key);
+  if (disk && disk.length > 0) {
+    memoryChannelCache.set(key, disk);
+    return disk;
+  }
+  return null;
+}
 
 export function playlistFetchUrl(sourceUrl: string): string {
   if (useLiveApiProxy()) {
-    return `/api/m3u?url=${encodeURIComponent(sourceUrl)}`;
+    return `${getApiBaseUrl()}/api/m3u?url=${encodeURIComponent(sourceUrl)}`;
   }
   return sourceUrl;
 }
 
 export function wrapStreamPlaybackUrl(rawStreamUrl: string): string {
   if (!rawStreamUrl) return rawStreamUrl;
-  if (rawStreamUrl.startsWith('/api/m3u-stream')) return rawStreamUrl;
+  if (rawStreamUrl.includes('/api/m3u-stream?url=')) return rawStreamUrl;
   if (useLiveApiProxy() && rawStreamUrl.startsWith('http://')) {
-    return `/api/m3u-stream?url=${encodeURIComponent(rawStreamUrl)}`;
+    return `${getApiBaseUrl()}/api/m3u-stream?url=${encodeURIComponent(rawStreamUrl)}`;
   }
   return rawStreamUrl;
 }
@@ -41,7 +64,7 @@ export async function probeM3uStream(streamUrl: string): Promise<boolean> {
 
   try {
     if (useLiveApiProxy()) {
-      const res = await fetch(`/api/m3u-probe?url=${encodeURIComponent(streamUrl)}`, {
+      const res = await fetch(`${getApiBaseUrl()}/api/m3u-probe?url=${encodeURIComponent(streamUrl)}`, {
         cache: 'no-store',
       });
       if (!res.ok) return true;
@@ -64,22 +87,14 @@ export async function probePlaylistHealth(
   }
 
   try {
-    if (useLiveApiProxy()) {
-      const res = await fetch(`/api/m3u-probe?url=${encodeURIComponent(playlist.url)}`, {
-        cache: 'no-store',
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { ok?: boolean; reason?: string };
-        const status: StreamHealthStatus = data.ok ? 'online' : 'offline';
-        setStreamHealth(playlist.id, status);
-        return { status, reason: data.reason };
-      }
-    } else {
-      const text = await platformFetchText(playlist.url);
-      const isOk = Boolean(text && (text.includes('#EXT') || text.includes('{')));
-      const status: StreamHealthStatus = isOk ? 'online' : 'offline';
+    const res = await fetch(`${getApiBaseUrl()}/api/m3u-probe?url=${encodeURIComponent(playlist.url)}`, {
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { ok?: boolean; reason?: string };
+      const status: StreamHealthStatus = data.ok ? 'online' : 'offline';
       setStreamHealth(playlist.id, status);
-      return { status };
+      return { status, reason: data.reason };
     }
   } catch {
     // ignore
@@ -92,14 +107,15 @@ export async function probePlaylistHealth(
 export async function probeAllPlaylistsHealth(
   playlists: CustomPlaylist[],
 ): Promise<void> {
-  await Promise.allSettled(playlists.map(p => probePlaylistHealth(p)));
+  // Batch in small groups of 4 to avoid saturating network/UI thread
+  const batchSize = 4;
+  for (let i = 0; i < playlists.length; i += batchSize) {
+    const chunk = playlists.slice(i, i + batchSize);
+    await Promise.allSettled(chunk.map(p => probePlaylistHealth(p)));
+  }
 }
 
 export async function fetchPlaylistText(sourceUrl: string): Promise<string | null> {
-  if (!useLiveApiProxy()) {
-    return platformFetchText(sourceUrl);
-  }
-
   const isDirectFriendly =
     sourceUrl.includes('iptv-org.github.io') ||
     sourceUrl.includes('raw.githubusercontent.com');
@@ -121,9 +137,9 @@ export async function fetchPlaylistText(sourceUrl: string): Promise<string | nul
     }
   }
 
-  // Web Proxy (/api/m3u?url=...) — uses IPTVSmartersPro User-Agent for Xtream servers
+  // Proxy (/api/m3u?url=...) — uses IPTVSmartersPro User-Agent for Xtream servers
   try {
-    const proxyUrl = `/api/m3u?url=${encodeURIComponent(sourceUrl)}`;
+    const proxyUrl = `${getApiBaseUrl()}/api/m3u?url=${encodeURIComponent(sourceUrl)}`;
     const proxyRes = await fetch(proxyUrl, {
       headers: { Accept: 'text/plain, application/json, */*' },
       cache: 'no-store',
@@ -152,7 +168,10 @@ export async function fetchPlaylistText(sourceUrl: string): Promise<string | nul
     }
   }
 
-  return platformFetchText(sourceUrl);
+  if (isNativeApp()) {
+    return platformFetchText(sourceUrl);
+  }
+  return null;
 }
 
 export type M3uFetchResult = {
@@ -193,12 +212,9 @@ export async function fetchCustomPlaylistChannels(
   playlist: CustomPlaylist,
   forceFresh = false,
 ): Promise<M3uFetchResult> {
-  const key = cacheKey(playlist.id);
-
   if (!forceFresh) {
-    const cached = readPersistentCache<Channel[]>(key);
+    const cached = loadChannelsCache(playlist.id);
     if (cached && cached.length > 0) {
-      void refreshPlaylistInBackground(playlist);
       return {
         channels: cached,
         catalogId: playlist.id,
@@ -209,17 +225,6 @@ export async function fetchCustomPlaylistChannels(
   }
 
   return loadPlaylistChannels(playlist);
-}
-
-async function refreshPlaylistInBackground(playlist: CustomPlaylist): Promise<void> {
-  try {
-    const result = await loadPlaylistChannels(playlist);
-    if (result.channels.length > 0 && !result.offline) {
-      writePersistentCache(cacheKey(playlist.id), result.channels, CACHE_TTL_MS);
-    }
-  } catch {
-    // background refresh fails silently
-  }
 }
 
 type XtreamCategoryItem = {
@@ -345,7 +350,7 @@ async function loadXtreamViaPlayerApi(
 
     if (channels.length > 0) {
       setStreamHealth(playlist.id, isBusy ? 'offline' : 'online');
-      writePersistentCache(cacheKey(playlist.id), channels, CACHE_TTL_MS);
+      saveChannelsCache(playlist.id, channels);
     } else {
       setStreamHealth(playlist.id, 'offline');
     }
@@ -387,7 +392,7 @@ async function loadPlaylistChannels(playlist: CustomPlaylist): Promise<M3uFetchR
       );
       if (xtreamResult) {
         if (xtreamResult.channels.length === 0) {
-          const cached = readPersistentCache<Channel[]>(cacheKey(playlist.id));
+          const cached = loadChannelsCache(playlist.id);
           if (cached?.length) {
             return {
               ...xtreamResult,
@@ -406,7 +411,7 @@ async function loadPlaylistChannels(playlist: CustomPlaylist): Promise<M3uFetchR
 
   if (!text) {
     setStreamHealth(playlist.id, 'offline');
-    const cached = readPersistentCache<Channel[]>(cacheKey(playlist.id));
+    const cached = loadChannelsCache(playlist.id);
     return {
       channels: cached ?? [],
       catalogId: playlist.id,
@@ -429,7 +434,7 @@ async function loadPlaylistChannels(playlist: CustomPlaylist): Promise<M3uFetchR
 
     if (channels.length > 0) {
       setStreamHealth(playlist.id, 'online');
-      writePersistentCache(cacheKey(playlist.id), channels, CACHE_TTL_MS);
+      saveChannelsCache(playlist.id, channels);
     } else {
       setStreamHealth(playlist.id, 'offline');
     }
@@ -443,7 +448,7 @@ async function loadPlaylistChannels(playlist: CustomPlaylist): Promise<M3uFetchR
     };
   } catch {
     setStreamHealth(playlist.id, 'offline');
-    const cached = readPersistentCache<Channel[]>(cacheKey(playlist.id));
+    const cached = loadChannelsCache(playlist.id);
     return {
       channels: cached ?? [],
       catalogId: playlist.id,
@@ -458,10 +463,8 @@ async function fetchLegacyCatalog(
   catalog: ReturnType<typeof getM3uCatalog> & object,
   forceFresh = false,
 ): Promise<M3uFetchResult> {
-  const key = cacheKey(catalog.id);
-
   if (!forceFresh) {
-    const cached = readPersistentCache<Channel[]>(key);
+    const cached = loadChannelsCache(catalog.id);
     if (cached?.length) {
       return { channels: cached, catalogId: catalog.id, fromCache: true, offline: false };
     }
@@ -469,7 +472,7 @@ async function fetchLegacyCatalog(
 
   const text = await fetchPlaylistText(catalog.url);
   if (!text) {
-    const cached = readPersistentCache<Channel[]>(key);
+    const cached = loadChannelsCache(catalog.id);
     return {
       channels: cached ?? [],
       catalogId: catalog.id,
@@ -485,11 +488,11 @@ async function fetchLegacyCatalog(
 
     const channels = toM3uChannels(entries, catalog.id, catalog.country);
     if (channels.length > 0) {
-      writePersistentCache(key, channels, CACHE_TTL_MS);
+      saveChannelsCache(catalog.id, channels);
     }
     return { channels, catalogId: catalog.id, fromCache: false, offline: false };
   } catch {
-    const cached = readPersistentCache<Channel[]>(key);
+    const cached = loadChannelsCache(catalog.id);
     return {
       channels: cached ?? [],
       catalogId: catalog.id,
@@ -506,13 +509,16 @@ export async function fetchM3uCatalog(catalogId: string): Promise<M3uFetchResult
 
 export function clearM3uCache(catalogId?: string): void {
   if (catalogId) {
+    memoryChannelCache.delete(cacheKey(catalogId));
     removePersistentCache(cacheKey(catalogId));
     removePersistentCache(`blvcktv_m3u_v1_${catalogId}`);
     return;
   }
+  memoryChannelCache.clear();
   for (const key of Object.keys(localStorage)) {
     if (key.startsWith('blvcktv_m3u_') || key.startsWith('blvcktv_playlist_')) {
       localStorage.removeItem(key);
     }
   }
 }
+

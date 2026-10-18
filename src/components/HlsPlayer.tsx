@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Maximize, Pause, Play, Volume2, VolumeX } from 'lucide-react';
-import { DLHD_REFERER } from '@/lib/dlhdPlayerUrls';
 
 type HlsPlayerProps = {
   src: string;
@@ -29,6 +28,9 @@ declare global {
       new (config?: {
         enableWorker?: boolean;
         lowLatencyMode?: boolean;
+        backBufferLength?: number;
+        maxBufferLength?: number;
+        maxMaxBufferLength?: number;
         xhrSetup?: (xhr: XMLHttpRequest, url: string) => void;
       }): HlsInstance;
     };
@@ -56,21 +58,50 @@ function loadHlsScript(): Promise<void> {
 export default function HlsPlayer({ src, title, onError, onReady, headerMode = 'dlhd' }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const [showUnmute, setShowUnmute] = useState(true);
+  const [muted, setMuted] = useState(false);
+  const [showUnmute, setShowUnmute] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+
+  const wakeControls = useCallback(() => {
+    setShowControls(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    wakeControls();
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, [wakeControls]);
 
   const startPlayback = useCallback(async (video: HTMLVideoElement) => {
     try {
-      video.muted = true;
+      video.muted = false;
       await video.play();
+      setMuted(false);
+      setShowUnmute(false);
       setPlaying(true);
       setLoading(false);
       onReady?.();
     } catch {
-      setLoading(false);
+      try {
+        video.muted = true;
+        await video.play();
+        setMuted(true);
+        setShowUnmute(true);
+        setPlaying(true);
+        setLoading(false);
+        onReady?.();
+      } catch {
+        setLoading(false);
+      }
     }
   }, [onReady]);
 
@@ -79,6 +110,7 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
     if (!video || !src) return;
 
     let cancelled = false;
+    let networkRetries = 0;
     setLoading(true);
     setFailed(false);
     setPlaying(false);
@@ -97,20 +129,12 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
         if (Hls?.isSupported()) {
           const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
-            xhrSetup: (xhr, _url) => {
+            lowLatencyMode: false,
+            backBufferLength: 30,
+            maxBufferLength: 30,
+            maxMaxBufferLength: 60,
+            xhrSetup: (xhr) => {
               xhr.withCredentials = false;
-              if (headerMode !== 'dlhd') return;
-              try {
-                xhr.setRequestHeader('Referer', DLHD_REFERER);
-                xhr.setRequestHeader('Origin', 'https://dlhd.pk');
-                xhr.setRequestHeader(
-                  'User-Agent',
-                  'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36',
-                );
-              } catch {
-                // ignore if headers already sent
-              }
             },
           });
           hlsRef.current = hls;
@@ -123,11 +147,13 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
             if (cancelled) return;
             const err = data as { fatal?: boolean; type?: string };
             if (!err.fatal) return;
-            if (err.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            if (err.type === Hls.ErrorTypes.NETWORK_ERROR && networkRetries < 2) {
+              networkRetries += 1;
               hls.startLoad();
               return;
             }
-            if (err.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            if (err.type === Hls.ErrorTypes.MEDIA_ERROR && networkRetries < 2) {
+              networkRetries += 1;
               hls.recoverMediaError();
               return;
             }
@@ -157,12 +183,28 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
 
     return () => {
       cancelled = true;
-      hlsRef.current?.destroy();
-      hlsRef.current = null;
+      if (hlsRef.current) {
+        try {
+          hlsRef.current.destroy();
+        } catch {
+          // ignore
+        }
+        hlsRef.current = null;
+      }
+      if (video) {
+        try {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        } catch {
+          // ignore
+        }
+      }
     };
   }, [src, onError, startPlayback, headerMode]);
 
   const togglePlay = () => {
+    wakeControls();
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -175,6 +217,7 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
   };
 
   const unmute = () => {
+    wakeControls();
     const video = videoRef.current;
     if (!video) return;
     video.muted = false;
@@ -185,6 +228,7 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
   };
 
   const toggleMute = () => {
+    wakeControls();
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
@@ -193,31 +237,37 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
   };
 
   const goFullscreen = () => {
+    wakeControls();
     const video = videoRef.current;
     if (!video) return;
-    if (document.fullscreenElement) document.exitFullscreen();
+    if (document.fullscreenElement) void document.exitFullscreen();
     else void video.requestFullscreen();
   };
 
   return (
-    <div className="relative w-full h-full bg-black group">
+    <div
+      className="relative w-full h-full bg-black group select-none"
+      onMouseMove={wakeControls}
+      onTouchStart={wakeControls}
+      onClick={wakeControls}
+    >
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
         playsInline
         autoPlay
-        muted
         title={title}
+        onClick={togglePlay}
       />
 
       {loading && !failed && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/80 z-10 pointer-events-none">
           <Loader2 size={36} className="text-[#8b5cf6] animate-spin" />
         </div>
       )}
 
       {failed && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-10 pointer-events-none">
           <p className="text-sm text-[#9ca3af]">Stream unavailable — trying fallback…</p>
         </div>
       )}
@@ -225,19 +275,29 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
       {showUnmute && playing && !failed && (
         <button
           type="button"
-          onClick={unmute}
+          onClick={(e) => {
+            e.stopPropagation();
+            unmute();
+          }}
           className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex items-center gap-2 px-5 py-3 rounded-full bg-[rgba(139,92,246,0.92)] text-white text-sm font-bold shadow-lg hover:bg-[#7c3aed] transition-colors"
         >
           <Volume2 size={18} /> Tap to unmute
         </button>
       )}
 
-      {/* Clean controls — no third-party overlays */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+      {/* Clean controls — visible on tap, mouse move, or D-Pad focus */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-200 ${
+          showControls ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+        }`}
+      >
         <button
           type="button"
-          onClick={togglePlay}
-          className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
           aria-label={playing ? 'Pause' : 'Play'}
         >
           {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
@@ -245,8 +305,11 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
 
         <button
           type="button"
-          onClick={toggleMute}
-          className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleMute();
+          }}
+          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
           aria-label={muted ? 'Unmute' : 'Mute'}
         >
           {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -256,8 +319,11 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
 
         <button
           type="button"
-          onClick={goFullscreen}
-          className="w-9 h-9 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+          onClick={(e) => {
+            e.stopPropagation();
+            goFullscreen();
+          }}
+          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
           aria-label="Fullscreen"
         >
           <Maximize size={16} />
@@ -266,3 +332,4 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
     </div>
   );
 }
+

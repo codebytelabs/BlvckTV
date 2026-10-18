@@ -114,6 +114,8 @@ function SportRow({
   );
 }
 
+const SIDEBAR_PAGE_SIZE = 60;
+
 export default function LivePlayerSidebar({
   channels,
   selectedChannelId,
@@ -126,8 +128,9 @@ export default function LivePlayerSidebar({
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [country, setCountry] = useState('');
-  const [sort, setSort] = useState<'az' | 'category'>('category');
+  const [sort, setSort] = useState<'default' | 'az'>('default');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(SIDEBAR_PAGE_SIZE);
   const { favoriteChannels } = useApp();
 
   const { now, currentEvents, worldCupUpcoming, majorEvents } = useSportsEvents();
@@ -136,14 +139,23 @@ export default function LivePlayerSidebar({
     [worldCupUpcoming, majorEvents],
   );
 
-  const categories = useMemo(
-    () => [...new Set(channels.map(c => c.category))].sort(),
-    [channels],
-  );
-  const countries = useMemo(
-    () => [...new Set(channels.map(c => c.country))].sort(),
-    [channels],
-  );
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    const limit = Math.min(channels.length, 4000);
+    for (let i = 0; i < limit; i++) {
+      if (channels[i].category) set.add(channels[i].category);
+    }
+    return [...set].sort();
+  }, [channels]);
+
+  const countries = useMemo(() => {
+    const set = new Set<string>();
+    const limit = Math.min(channels.length, 4000);
+    for (let i = 0; i < limit; i++) {
+      if (channels[i].country) set.add(channels[i].country);
+    }
+    return [...set].sort();
+  }, [channels]);
 
   const favoriteList = useMemo(
     () => resolveFavoriteChannels(favoriteChannels, channels),
@@ -154,13 +166,22 @@ export default function LivePlayerSidebar({
   const filteredChannels = useMemo(() => {
     let list = favoritesOnly
       ? favoriteList
-      : filterChannelsByQuery(channels, search);
+      : search
+        ? filterChannelsByQuery(channels, search)
+        : channels;
     if (category) list = list.filter(c => c.category === category);
     if (country) list = list.filter(c => c.country === country);
-    if (sort === 'az') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    else list = [...list].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+    if (sort === 'az' && list.length <= 3000) {
+      list = [...list].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    }
     return list;
   }, [channels, favoriteList, favoritesOnly, search, category, country, sort]);
+
+  const displayedChannels = useMemo(
+    () => filteredChannels.slice(0, visibleCount),
+    [filteredChannels, visibleCount],
+  );
+  const hasMore = visibleCount < filteredChannels.length;
 
   return (
     <aside className={`w-full lg:w-[340px] shrink-0 flex flex-col bg-[#0a0a0f] lg:border-l border-[rgba(139,92,246,0.1)] ${className}`}>
@@ -172,7 +193,7 @@ export default function LivePlayerSidebar({
             <span className="text-xs font-bold text-[#f1f1f4] uppercase tracking-wide">Live Now</span>
           </div>
           <div className="space-y-1">
-            {currentEvents.map(event => (
+            {currentEvents.slice(0, 4).map(event => (
               <SportRow key={event.id} event={event} now={now} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
             ))}
           </div>
@@ -205,7 +226,10 @@ export default function LivePlayerSidebar({
               <input
                 type="text"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => {
+                  setSearch(e.target.value);
+                  setVisibleCount(SIDEBAR_PAGE_SIZE);
+                }}
                 placeholder="Search channels…"
                 className="w-full pl-8 pr-3 py-2 rounded-lg bg-[#14141f] border border-[rgba(139,92,246,0.12)] text-xs text-[#f1f1f4] placeholder-[#6b7280] outline-none focus:border-[#8b5cf6]"
               />
@@ -213,7 +237,10 @@ export default function LivePlayerSidebar({
             <div className="flex gap-1.5 flex-wrap">
               <button
                 type="button"
-                onClick={() => setFavoritesOnly(v => !v)}
+                onClick={() => {
+                  setFavoritesOnly(v => !v);
+                  setVisibleCount(SIDEBAR_PAGE_SIZE);
+                }}
                 className={`inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold border transition-colors ${
                   favoritesOnly
                     ? 'bg-[rgba(245,158,11,0.15)] border-[rgba(245,158,11,0.35)] text-[#f59e0b]'
@@ -225,7 +252,10 @@ export default function LivePlayerSidebar({
               </button>
               <select
                 value={category}
-                onChange={e => setCategory(e.target.value)}
+                onChange={e => {
+                  setCategory(e.target.value);
+                  setVisibleCount(SIDEBAR_PAGE_SIZE);
+                }}
                 className="flex-1 min-w-[80px] bg-[#14141f] border border-[rgba(139,92,246,0.12)] text-[#f1f1f4] text-[10px] rounded-lg px-2 py-1.5 outline-none"
               >
                 <option value="">All genres</option>
@@ -233,7 +263,10 @@ export default function LivePlayerSidebar({
               </select>
               <select
                 value={country}
-                onChange={e => setCountry(e.target.value)}
+                onChange={e => {
+                  setCountry(e.target.value);
+                  setVisibleCount(SIDEBAR_PAGE_SIZE);
+                }}
                 className="flex-1 min-w-[70px] bg-[#14141f] border border-[rgba(139,92,246,0.12)] text-[#f1f1f4] text-[10px] rounded-lg px-2 py-1.5 outline-none"
               >
                 <option value="">All regions</option>
@@ -241,33 +274,46 @@ export default function LivePlayerSidebar({
               </select>
               <select
                 value={sort}
-                onChange={e => setSort(e.target.value as 'az' | 'category')}
+                onChange={e => setSort(e.target.value as 'default' | 'az')}
                 className="bg-[#14141f] border border-[rgba(139,92,246,0.12)] text-[#f1f1f4] text-[10px] rounded-lg px-2 py-1.5 outline-none"
               >
-                <option value="category">By genre</option>
+                <option value="default">Default</option>
                 <option value="az">A–Z</option>
               </select>
             </div>
-            <p className="text-[10px] text-[#6b7280] tabular-nums">{filteredChannels.length} channels</p>
+            <p className="text-[10px] text-[#6b7280] tabular-nums">
+              Showing {displayedChannels.length} of {filteredChannels.length} channels
+            </p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-            {filteredChannels.length === 0 ? (
+            {displayedChannels.length === 0 ? (
               <p className="text-center text-xs text-[#6b7280] py-8 px-3">
                 {favoritesOnly ? 'No favorite channels yet. Star a channel to save it.' : 'No channels match your filters.'}
               </p>
             ) : (
-              filteredChannels.map(channel => (
-                <ChannelRow
-                  key={channel.id}
-                  channel={channel}
-                  isActive={channel.id === selectedChannelId}
-                  onSelect={() => {
-                    onSelectChannel(channel);
-                    onNavigate?.();
-                  }}
-                />
-              ))
+              <>
+                {displayedChannels.map(channel => (
+                  <ChannelRow
+                    key={channel.id}
+                    channel={channel}
+                    isActive={channel.id === selectedChannelId}
+                    onSelect={() => {
+                      onSelectChannel(channel);
+                      onNavigate?.();
+                    }}
+                  />
+                ))}
+                {hasMore && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(prev => prev + SIDEBAR_PAGE_SIZE)}
+                    className="w-full mt-2 py-2.5 rounded-lg bg-[#14141f] hover:bg-[#1e1e2d] border border-[rgba(139,92,246,0.25)] text-xs font-bold text-[#8b5cf6] transition-colors"
+                  >
+                    Load More ({displayedChannels.length} / {filteredChannels.length})
+                  </button>
+                )}
+              </>
             )}
           </div>
         </>

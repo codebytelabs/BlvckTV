@@ -28,7 +28,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { X, Monitor, Maximize, RefreshCw, Radio, List, ChevronDown } from 'lucide-react';
+import { X, Monitor, Maximize, RefreshCw, Radio, List, ChevronDown, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Channel } from '@/types';
 import type { SportsEvent } from '@/lib/sportsEvents';
 import { isM3uChannelId } from '@/lib/m3uCatalogs';
@@ -113,6 +113,11 @@ export default function LiveTVPlayer() {
     setLoading(false);
   }, []);
 
+  const activeChannelMeta = useRef<Channel | undefined>(undefined);
+  activeChannelMeta.current = selectedChannel
+    ? channels.find(c => c.id === selectedChannel.id)
+    : undefined;
+
   useEffect(() => {
     if (!selectedChannel) {
       setM3u8Url(null);
@@ -128,10 +133,8 @@ export default function LiveTVPlayer() {
     document.body.setAttribute('data-player-open', 'true');
     autoFallbackRef.current = true;
 
-    const streamUrl = selectedChannel.streamUrl
-      ?? channels.find(c => c.id === selectedChannel.id)?.streamUrl;
-    const provider = selectedChannel.provider
-      ?? channels.find(c => c.id === selectedChannel.id)?.provider;
+    const streamUrl = selectedChannel.streamUrl ?? activeChannelMeta.current?.streamUrl;
+    const provider = selectedChannel.provider ?? activeChannelMeta.current?.provider;
     const isM3u = provider === 'm3u' || isM3uChannelId(selectedChannel.id);
 
     const startServer = isM3u || isNativeApp() ? 'hls' : getPreferredPath(selectedChannel.id);
@@ -150,11 +153,19 @@ export default function LiveTVPlayer() {
     return () => {
       document.body.removeAttribute('data-player-open');
     };
-  }, [selectedChannel?.id, selectedChannel?.streamUrl, selectedChannel?.provider, channels, loadChannel]);
+  }, [selectedChannel?.id, selectedChannel?.streamUrl, selectedChannel?.provider, loadChannel]);
 
   const switchChannel = useCallback((channel: Channel) => {
     setSelectedChannel(resolveLiveChannel(channel, channels));
   }, [setSelectedChannel, channels]);
+
+  const stepChannel = useCallback((step: number) => {
+    if (!selectedChannel || channels.length === 0) return;
+    const idx = channels.findIndex(c => c.id === selectedChannel.id);
+    const nextIdx = idx >= 0 ? (idx + step + channels.length) % channels.length : 0;
+    const nextChannel = channels[nextIdx];
+    if (nextChannel) switchChannel(nextChannel);
+  }, [selectedChannel, channels, switchChannel]);
 
   const switchSport = useCallback((event: SportsEvent) => {
     const resolved = resolveSportsChannel(
@@ -170,12 +181,8 @@ export default function LiveTVPlayer() {
       if (e.key === 'Escape') handleClose();
     };
     const handleChannelStep = (e: Event) => {
-      if (!selectedChannel || channels.length === 0) return;
       const step = (e as CustomEvent<number>).detail ?? 1;
-      const idx = channels.findIndex(c => c.id === selectedChannel.id);
-      const nextIdx = idx >= 0 ? (idx + step + channels.length) % channels.length : 0;
-      const nextChannel = channels[nextIdx];
-      if (nextChannel) switchChannel(nextChannel);
+      stepChannel(step);
     };
     window.addEventListener('keydown', handleKey);
     window.addEventListener('blvcktv:channel-step', handleChannelStep);
@@ -183,7 +190,7 @@ export default function LiveTVPlayer() {
       window.removeEventListener('keydown', handleKey);
       window.removeEventListener('blvcktv:channel-step', handleChannelStep);
     };
-  }, [handleClose, selectedChannel, channels, switchChannel]);
+  }, [handleClose, stepChannel]);
 
   useEffect(() => {
     if (!showServerMenu) return;
@@ -196,10 +203,8 @@ export default function LiveTVPlayer() {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [showServerMenu]);
 
-  const channelStreamUrl = selectedChannel?.streamUrl
-    ?? (selectedChannel ? channels.find(c => c.id === selectedChannel.id)?.streamUrl : undefined);
-  const channelProvider = selectedChannel?.provider
-    ?? (selectedChannel ? channels.find(c => c.id === selectedChannel.id)?.provider : undefined);
+  const channelStreamUrl = selectedChannel?.streamUrl ?? activeChannelMeta.current?.streamUrl;
+  const channelProvider = selectedChannel?.provider ?? activeChannelMeta.current?.provider;
   const isM3uPlayback = channelProvider === 'm3u' || (selectedChannel ? isM3uChannelId(selectedChannel.id) : false);
 
   const switchServer = useCallback((server: LiveServer) => {
@@ -315,6 +320,9 @@ export default function LiveTVPlayer() {
       ? ['hls']
       : [...sortLivePaths(availablePaths), 'hls'];
 
+  const favCategory = activeChannelMeta.current?.category ?? 'Live';
+  const favCountry = activeChannelMeta.current?.country ?? '—';
+
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col lg:flex-row"
@@ -323,7 +331,19 @@ export default function LiveTVPlayer() {
       tabIndex={-1}
     >
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-[#0a0a0f] border-b border-[rgba(139,92,246,0.1)] shrink-0 pt-[env(safe-area-inset-top)] lg:pt-2">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-4 py-2 bg-[#0a0a0f] border-b border-[rgba(139,92,246,0.15)] shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))] lg:pt-2 z-30">
+          {/* Prominent Back Button for Android / TV Remote / Touch */}
+          <button
+            type="button"
+            onClick={handleClose}
+            autoFocus
+            className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(239,68,68,0.18)] hover:bg-[rgba(239,68,68,0.3)] border border-[rgba(239,68,68,0.35)] text-[#fca5a5] text-xs font-bold shrink-0"
+            aria-label="Back to channels"
+          >
+            <ArrowLeft size={15} />
+            <span className="hidden xs:inline sm:inline">Back</span>
+          </button>
+
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[#f1f1f4] truncate">{selectedChannel.name}</h3>
             <span className="flex items-center gap-1.5 text-[10px]">
@@ -340,19 +360,42 @@ export default function LiveTVPlayer() {
             </span>
           </div>
 
+          {/* Quick Prev / Next Channel Switchers */}
+          {channels.length > 1 && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => stepChannel(-1)}
+                className="touch-target w-9 h-9 rounded-lg bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                aria-label="Previous channel"
+                title="Previous channel"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => stepChannel(1)}
+                className="touch-target w-9 h-9 rounded-lg bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                aria-label="Next channel"
+                title="Next channel"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
+
           <div className="relative" ref={serverMenuRef}>
             {!isM3uPlayback && (
-            <button
-              type="button"
-              onClick={() => setShowServerMenu(v => !v)}
-              className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(139,92,246,0.15)] text-[#8b5cf6] text-xs font-bold max-w-[140px] sm:max-w-none"
-              aria-expanded={showServerMenu}
-            >
-              <Monitor size={14} className="shrink-0" />
-              <span className="truncate">{currentServer === 'hls' ? 'Clean' : (LIVE_PATH_LABELS[currentServer] ?? currentServer)}</span>
-              <ChevronDown size={12} className="shrink-0" />
-            </button>
-
+              <button
+                type="button"
+                onClick={() => setShowServerMenu(v => !v)}
+                className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(139,92,246,0.15)] text-[#8b5cf6] text-xs font-bold max-w-[140px] sm:max-w-none"
+                aria-expanded={showServerMenu}
+              >
+                <Monitor size={14} className="shrink-0" />
+                <span className="truncate">{currentServer === 'hls' ? 'Clean' : (LIVE_PATH_LABELS[currentServer] ?? currentServer)}</span>
+                <ChevronDown size={12} className="shrink-0" />
+              </button>
             )}
 
             {showServerMenu && !isM3uPlayback && (
@@ -391,44 +434,29 @@ export default function LiveTVPlayer() {
             <button
               type="button"
               onClick={() => setBrowseOpen(true)}
-              className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(255,255,255,0.08)] text-[#f1f1f4] text-xs font-bold"
+              className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(139,92,246,0.18)] border border-[rgba(139,92,246,0.3)] text-[#c4b5fd] text-xs font-bold shrink-0"
             >
-              <List size={14} /> Browse
+              <List size={14} /> Channels
             </button>
           )}
 
-          {selectedChannel && (
-            <>
-              <FavoriteChannelButton
-                channel={{
-                  id: selectedChannel.id,
-                  name: selectedChannel.name,
-                  logo: selectedChannel.logo,
-                  category: channels.find(c => c.id === selectedChannel.id)?.category ?? 'Live',
-                  country: channels.find(c => c.id === selectedChannel.id)?.country ?? '—',
-                  streamUrl: selectedChannel.streamUrl,
-                }}
-                showLabel
-                className="hidden sm:inline-flex"
-              />
-              <FavoriteChannelButton
-                channel={{
-                  id: selectedChannel.id,
-                  name: selectedChannel.name,
-                  logo: selectedChannel.logo,
-                  category: channels.find(c => c.id === selectedChannel.id)?.category ?? 'Live',
-                  country: channels.find(c => c.id === selectedChannel.id)?.country ?? '—',
-                  streamUrl: selectedChannel.streamUrl,
-                }}
-                className="sm:hidden"
-              />
-            </>
-          )}
+          <FavoriteChannelButton
+            channel={{
+              id: selectedChannel.id,
+              name: selectedChannel.name,
+              logo: selectedChannel.logo,
+              category: favCategory,
+              country: favCountry,
+              streamUrl: selectedChannel.streamUrl,
+            }}
+            showLabel
+            className="hidden sm:inline-flex"
+          />
 
           <button
             type="button"
             onClick={retry}
-            className="touch-target w-10 h-10 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(255,255,255,0.14)]"
+            className="touch-target w-9 h-9 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(255,255,255,0.14)] shrink-0"
             aria-label="Retry"
             title="Retry stream"
           >
@@ -438,10 +466,10 @@ export default function LiveTVPlayer() {
           <button
             type="button"
             onClick={() => {
-              if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-              else document.exitFullscreen();
+              if (!document.fullscreenElement) void document.documentElement.requestFullscreen();
+              else void document.exitFullscreen();
             }}
-            className="touch-target w-10 h-10 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(255,255,255,0.14)]"
+            className="touch-target w-9 h-9 rounded-full bg-[rgba(255,255,255,0.08)] hidden sm:flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(255,255,255,0.14)] shrink-0"
             aria-label="Fullscreen"
           >
             <Maximize size={14} />
@@ -450,7 +478,7 @@ export default function LiveTVPlayer() {
           <button
             type="button"
             onClick={handleClose}
-            className="touch-target w-10 h-10 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(239,68,68,0.25)]"
+            className="touch-target w-9 h-9 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(239,68,68,0.25)] shrink-0"
             aria-label="Close"
           >
             <X size={16} />
@@ -474,16 +502,25 @@ export default function LiveTVPlayer() {
               <p className="text-sm text-[#9ca3af]">Stream unavailable for this channel.</p>
               <p className="text-xs text-[#6b7280]">
                 {isNativeApp()
-                  ? 'Check your connection and tap Retry.'
-                  : 'Try Watch or Player from the server menu.'}
+                  ? 'Tap Next Channel above or Retry.'
+                  : 'Try another channel or tap Retry.'}
               </p>
-              <button
-                type="button"
-                onClick={retry}
-                className="touch-target px-4 py-2.5 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold"
-              >
-                Retry
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={retry}
+                  className="touch-target px-4 py-2.5 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold"
+                >
+                  Retry
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stepChannel(1)}
+                  className="touch-target px-4 py-2.5 rounded-lg bg-[#1e1e2d] border border-[rgba(139,92,246,0.3)] text-[#f1f1f4] text-xs font-bold"
+                >
+                  Next Channel
+                </button>
+              </div>
             </div>
           ) : iframeUrl ? (
             <StreamIframe
@@ -496,7 +533,7 @@ export default function LiveTVPlayer() {
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
               <p className="text-sm text-[#9ca3af]">Could not load stream.</p>
-              <p className="text-xs text-[#6b7280]">Try another server from the menu above.</p>
+              <p className="text-xs text-[#6b7280]">Try another server or channel from the bar above.</p>
               <button
                 type="button"
                 onClick={retry}
@@ -509,35 +546,39 @@ export default function LiveTVPlayer() {
         </div>
       </div>
 
-      <div className="hidden lg:flex">
-        <LivePlayerSidebar
-          channels={channels}
-          selectedChannelId={selectedChannel.id}
-          onSelectChannel={switchChannel}
-          onSelectSport={switchSport}
-        />
-      </div>
-
-      <Sheet open={browseOpen} onOpenChange={setBrowseOpen}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-[20px] border-[rgba(139,92,246,0.15)] bg-[#0a0a0f] p-0 pb-[env(safe-area-inset-bottom)] h-[75vh] max-h-[75vh]"
-        >
-          <SheetHeader className="px-4 py-3 border-b border-[rgba(139,92,246,0.1)]">
-            <SheetTitle className="text-[#f1f1f4] text-left text-sm font-extrabold">
-              Channels & Sports
-            </SheetTitle>
-          </SheetHeader>
+      {!isMobile && (
+        <div className="hidden lg:flex">
           <LivePlayerSidebar
             channels={channels}
             selectedChannelId={selectedChannel.id}
             onSelectChannel={switchChannel}
             onSelectSport={switchSport}
-            className="h-full min-h-0 border-0"
-            onNavigate={() => setBrowseOpen(false)}
           />
-        </SheetContent>
-      </Sheet>
+        </div>
+      )}
+
+      {isMobile && browseOpen && (
+        <Sheet open={browseOpen} onOpenChange={setBrowseOpen}>
+          <SheetContent
+            side="bottom"
+            className="rounded-t-[20px] border-[rgba(139,92,246,0.15)] bg-[#0a0a0f] p-0 pb-[env(safe-area-inset-bottom)] h-[75vh] max-h-[75vh]"
+          >
+            <SheetHeader className="px-4 py-3 border-b border-[rgba(139,92,246,0.1)]">
+              <SheetTitle className="text-[#f1f1f4] text-left text-sm font-extrabold">
+                Channels & Sports
+              </SheetTitle>
+            </SheetHeader>
+            <LivePlayerSidebar
+              channels={channels}
+              selectedChannelId={selectedChannel.id}
+              onSelectChannel={switchChannel}
+              onSelectSport={switchSport}
+              className="h-full min-h-0 border-0"
+              onNavigate={() => setBrowseOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }

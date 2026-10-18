@@ -33,7 +33,14 @@ function getActiveScopeRoot(): ParentNode {
 
 function getFocusableElements(): HTMLElement[] {
   const root = getActiveScopeRoot();
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(isVisible);
+  const raw = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+  const result: HTMLElement[] = [];
+  for (let i = 0; i < raw.length && result.length < 180; i++) {
+    if (isVisible(raw[i])) {
+      result.push(raw[i]);
+    }
+  }
+  return result;
 }
 
 type Direction = 'up' | 'down' | 'left' | 'right';
@@ -82,6 +89,12 @@ function findNextFocusable(current: HTMLElement, dir: Direction, candidates: HTM
   return best;
 }
 
+declare global {
+  interface Window {
+    __blvcktvHandleBack?: () => boolean;
+  }
+}
+
 /**
  * Spatial 2D D-Pad / TV Remote navigation hook for Android TV & Smart TV browsers.
  */
@@ -96,20 +109,34 @@ export function useTvRemoteNavigation(): void {
   } = useApp();
 
   useEffect(() => {
-    const handleTvBack = (e: Event) => {
+    const closeActiveOverlay = (): boolean => {
+      if (document.activeElement instanceof HTMLElement && document.activeElement.tagName === 'IFRAME') {
+        document.activeElement.blur();
+      }
+      if (document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => {});
+        return true;
+      }
       if (selectedVideo) {
-        e.preventDefault();
         setSelectedVideo(null);
-        return;
+        return true;
       }
       if (selectedChannel) {
-        e.preventDefault();
         setSelectedChannel(null);
-        return;
+        return true;
       }
       if (selectedDetail) {
-        e.preventDefault();
         setSelectedDetail(null);
+        return true;
+      }
+      return false;
+    };
+
+    window.__blvcktvHandleBack = closeActiveOverlay;
+
+    const handleTvBack = (e: Event) => {
+      if (closeActiveOverlay()) {
+        e.preventDefault();
         return;
       }
       const firstNav = document.querySelector<HTMLElement>('aside button, nav button');
@@ -120,7 +147,10 @@ export function useTvRemoteNavigation(): void {
     };
 
     window.addEventListener('blvcktv:tv-back', handleTvBack);
-    return () => window.removeEventListener('blvcktv:tv-back', handleTvBack);
+    return () => {
+      window.removeEventListener('blvcktv:tv-back', handleTvBack);
+      delete window.__blvcktvHandleBack;
+    };
   }, [
     selectedVideo,
     setSelectedVideo,

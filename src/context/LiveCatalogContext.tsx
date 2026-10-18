@@ -94,13 +94,6 @@ export function LiveCatalogProvider({ children }: { children: ReactNode }) {
     };
   }, [refreshPlaylists]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      void checkStreamsHealth();
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [checkStreamsHealth]);
-
   const activePlaylist = useMemo(
     () => playlists.find(p => p.id === catalogId) ?? playlists[0],
     [playlists, catalogId],
@@ -155,7 +148,7 @@ export function LiveCatalogProvider({ children }: { children: ReactNode }) {
     if (fromList.length > 0) return fromList;
     return FALLBACK_CHANNELS.filter(c => c.category === 'Sports');
   }, [channels]);
-  const liveChannels = useMemo(() => channels.filter(c => c.isLive), [channels]);
+  const liveChannels = useMemo(() => channels.slice(0, 60), [channels]);
 
   const value = useMemo(
     (): LiveCatalogContextValue => ({

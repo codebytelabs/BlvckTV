@@ -3,7 +3,7 @@ import { useApp } from '@/context/AppContext';
 import { useTMDB } from '@/hooks/useTMDB';
 import { getMovieEmbedUrl, getTVEmbedUrl, SOURCES } from '@/lib/streamingSources';
 import StreamIframe from '@/components/StreamIframe';
-import { X, Monitor, ChevronDown, Subtitles, Maximize } from 'lucide-react';
+import { X, Monitor, ChevronDown, Subtitles, Maximize, ArrowLeft } from 'lucide-react';
 import type { StreamingSource, TVEpisode, ContinueWatchingItem } from '@/types';
 
 const selectClass =
@@ -16,13 +16,11 @@ export default function VideoPlayer() {
     (settings.sourcePriority?.[0] || 'vidsrcme') as StreamingSource,
   );
   const [showSourceMenu, setShowSourceMenu] = useState(false);
-  const [showControls, setShowControls] = useState(true);
   const [showSubtitleUpload, setShowSubtitleUpload] = useState(false);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [seasonCount, setSeasonCount] = useState(1);
   const [episodes, setEpisodes] = useState<TVEpisode[]>([]);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
-  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const progressRef = useRef(0);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -206,20 +204,12 @@ export default function VideoPlayer() {
     return () => window.removeEventListener('keydown', handleKey);
   }, [handleClose]);
 
-  const handleMouseMove = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 3000);
-  };
-
   if (!selectedVideo) return null;
 
   return (
     <div
       className="fixed inset-0 z-[100] flex flex-col"
       style={{ background: '#000' }}
-      onMouseMove={handleMouseMove}
-      onTouchStart={() => setShowControls(true)}
       data-player-open="true"
     >
       <div className="flex-1 min-h-0 relative">
@@ -233,10 +223,20 @@ export default function VideoPlayer() {
       </div>
 
       <div
-        className="shrink-0 flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-0 sm:h-14 bg-[#0a0a0f] border-t border-[rgba(139,92,246,0.1)] transition-opacity duration-300 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0"
-        style={{ opacity: showControls ? 1 : 0.35 }}
+        className="shrink-0 flex flex-wrap items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 sm:py-0 sm:h-14 bg-[#0a0a0f] border-t border-[rgba(139,92,246,0.15)] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pb-0 z-30"
       >
-        <div className="flex-1 min-w-0 basis-full sm:basis-auto order-first sm:order-none">
+        <button
+          type="button"
+          onClick={handleClose}
+          autoFocus
+          className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(239,68,68,0.18)] hover:bg-[rgba(239,68,68,0.3)] border border-[rgba(239,68,68,0.35)] text-[#fca5a5] text-xs font-bold shrink-0"
+          aria-label="Back"
+        >
+          <ArrowLeft size={15} />
+          <span>Back</span>
+        </button>
+
+        <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-[#f1f1f4] truncate">{selectedVideo.title}</h3>
         </div>
 
