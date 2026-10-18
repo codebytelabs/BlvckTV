@@ -1,14 +1,13 @@
-import { isNativeApp } from '@/lib/nativePlatform';
-
-export const REMOTE_API_ORIGIN = 'https://blvcktv-hum5mngfo-codebytelabs-projects.vercel.app';
-
-/** Returns '' on Web (same-origin) or the deployed Vercel origin on Native Android. */
+/**
+ * Both Web (Vite / Vercel) and Native Android (MainActivity BridgeWebViewClient)
+ * serve /api/m3u, /api/m3u-probe, and /api/m3u-stream on same-origin.
+ */
 export function getApiBaseUrl(): string {
-  return isNativeApp() ? REMOTE_API_ORIGIN : '';
+  return '';
 }
 
-/** Both Web and Native Android can use the fast /api proxy via Chromium's native network stack. */
 export function useLiveApiProxy(): boolean {
   return true;
 }
+
 

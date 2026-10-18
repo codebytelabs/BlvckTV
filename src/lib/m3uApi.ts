@@ -19,7 +19,7 @@ import { platformFetchText } from '@/lib/platformHttp';
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_PERSISTENT_CACHE_CHANNELS = 1500;
-const cacheKey = (id: string) => `blvcktv_m3u_v3_${id}`;
+const cacheKey = (id: string) => `blvcktv_m3u_v4_${id}`;
 const memoryChannelCache = new Map<string, Channel[]>();
 
 function saveChannelsCache(id: string, channels: Channel[]): void {
@@ -51,8 +51,11 @@ export function playlistFetchUrl(sourceUrl: string): string {
 
 export function wrapStreamPlaybackUrl(rawStreamUrl: string): string {
   if (!rawStreamUrl) return rawStreamUrl;
-  if (rawStreamUrl.includes('/api/m3u-stream?url=')) return rawStreamUrl;
-  if (useLiveApiProxy() && rawStreamUrl.startsWith('http://')) {
+  if (rawStreamUrl.includes('/api/m3u-stream?url=')) {
+    const queryPart = rawStreamUrl.split('/api/m3u-stream?url=')[1] ?? '';
+    return `/api/m3u-stream?url=${queryPart}`;
+  }
+  if (useLiveApiProxy() && /^https?:\/\//i.test(rawStreamUrl)) {
     return `${getApiBaseUrl()}/api/m3u-stream?url=${encodeURIComponent(rawStreamUrl)}`;
   }
   return rawStreamUrl;

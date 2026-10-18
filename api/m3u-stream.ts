@@ -37,7 +37,7 @@ export default async function handler(req: VercelReq, res: VercelRes): Promise<v
   }
 
   try {
-    const upstream = await fetch(target, {
+    let upstream = await fetch(target, {
       method: 'GET',
       headers: {
         'User-Agent': 'IPTVSmartersPro',
@@ -46,6 +46,19 @@ export default async function handler(req: VercelReq, res: VercelRes): Promise<v
       redirect: 'follow',
       signal: AbortSignal.timeout(15000),
     });
+
+    if (!upstream.ok && upstream.status >= 400 && upstream.status !== 884) {
+      upstream = await fetch(target, {
+        method: 'GET',
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+          Accept: '*/*',
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(15000),
+      });
+    }
 
     if (!upstream.ok || upstream.status >= 400 || upstream.status === 884) {
       res.status(upstream.status >= 400 ? upstream.status : 502).send('Stream unavailable');

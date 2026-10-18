@@ -55,6 +55,16 @@ function parseExtinfLine(line: string): { name: string; logo: string; group: str
   };
 }
 
+function normalizeStreamUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  // Convert Xtream raw MPEG-TS live URLs (http://host:port/[live/]user/pass/12345[.ts]) to HLS .m3u8
+  const xtreamMatch = trimmed.match(/^(https?:\/\/[^/]+)\/(?:live\/)?([^/?#]+)\/([^/?#]+)\/(\d+)(?:\.ts)?$/i);
+  if (xtreamMatch) {
+    return `${xtreamMatch[1]}/live/${xtreamMatch[2]}/${xtreamMatch[3]}/${xtreamMatch[4]}.m3u8`;
+  }
+  return trimmed;
+}
+
 /** Parse standard #EXTM3U playlist text into channel entries. */
 export function parseM3uText(text: string): ParsedM3uEntry[] {
   const lines = text.split(/\r?\n/);
@@ -80,7 +90,7 @@ export function parseM3uText(text: string): ParsedM3uEntry[] {
 
     entries.push({
       ...pending,
-      url: line,
+      url: normalizeStreamUrl(line),
     });
     pending = null;
   }

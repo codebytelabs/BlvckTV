@@ -280,9 +280,7 @@ export default function LiveTVPlayer() {
     if (isM3uPlayback) {
       if (autoFallbackRef.current && m3u8Url) {
         autoFallbackRef.current = false;
-        const proxyPrefix = isNativeApp()
-          ? 'https://blvcktv-hum5mngfo-codebytelabs-projects.vercel.app/api/m3u-stream?url='
-          : '/api/m3u-stream?url=';
+        const proxyPrefix = '/api/m3u-stream?url=';
         if (m3u8Url.includes('/api/m3u-stream?url=')) {
           const raw = decodeURIComponent(m3u8Url.split('/api/m3u-stream?url=')[1] ?? '');
           if (raw) {

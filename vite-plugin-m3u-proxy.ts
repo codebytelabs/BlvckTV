@@ -178,6 +178,18 @@ export function m3uProxyPlugin(): Plugin {
                 redirect: 'follow',
                 signal: controller.signal,
               });
+              if (!upstream.ok && upstream.status >= 400 && upstream.status !== 884) {
+                upstream = await fetch(target, {
+                  method: 'GET',
+                  headers: {
+                    'User-Agent':
+                      'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
+                    Accept: '*/*',
+                  },
+                  redirect: 'follow',
+                  signal: controller.signal,
+                });
+              }
             } finally {
               clearTimeout(timeout);
             }
