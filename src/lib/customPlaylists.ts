@@ -52,19 +52,6 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     isDefault: true,
     createdAt: 3,
   },
-  {
-    id: 'default-infinity-4',
-    name: 'InfinityTV 4 (1406627)',
-    type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=140662723428643&password=9693802739&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '140662723428643',
-    password: '9693802739',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 4,
-  },
   // --- Magnike (magnike.com) ---
   {
     id: 'default-magnike-2',
@@ -200,19 +187,6 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
   },
   // --- Remaining InfinityTV ---
   {
-    id: 'default-infinity-2',
-    name: 'InfinityTV 2 (132882D)',
-    type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=132882DA79288D3&password=zhuYWVLfqB&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '132882DA79288D3',
-    password: 'zhuYWVLfqB',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 15,
-  },
-  {
     id: 'default-infinity-5',
     name: 'InfinityTV 5 (1472870)',
     type: 'xstream',
@@ -292,19 +266,6 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     createdAt: 21,
   },
   {
-    id: 'default-atlaspro-4',
-    name: 'Atlas Pro 4 (31531c3)',
-    type: 'xstream',
-    url: 'http://line.atlaspro4k.me:80/get.php?username=31531c3d9b&password=2091e80a6c23&type=m3u_plus',
-    serverUrl: 'http://line.atlaspro4k.me:80',
-    username: '31531c3d9b',
-    password: '2091e80a6c23',
-    outputFormat: 'ts',
-    enabled: true,
-    isDefault: true,
-    createdAt: 22,
-  },
-  {
     id: 'default-atlaspro-5',
     name: 'Atlas Pro 5 (3401ef2)',
     type: 'xstream',
@@ -317,50 +278,179 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     isDefault: true,
     createdAt: 23,
   },
+  // --- MadoArt (madoart.xyz) ---
   {
-    id: 'default-atlaspro-6',
-    name: 'Atlas Pro 6 (3675327)',
+    id: 'default-madoart-1',
+    name: 'MadoArt 1 (0C4C923)',
     type: 'xstream',
-    url: 'http://line.atlaspro4k.me:80/get.php?username=3675327130&password=49f38d0cd70e&type=m3u_plus',
-    serverUrl: 'http://line.atlaspro4k.me:80',
-    username: '3675327130',
-    password: '49f38d0cd70e',
-    outputFormat: 'ts',
+    url: 'http://madoart.xyz/get.php?username=0C4C92354FA7954&password=lhfTdg0csG&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://madoart.xyz',
+    username: '0C4C92354FA7954',
+    password: 'lhfTdg0csG',
+    outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 24,
+    createdAt: 25,
+  },
+  {
+    id: 'default-madoart-2',
+    name: 'MadoArt 2 (33F6R73)',
+    type: 'xstream',
+    url: 'http://madoart.xyz/get.php?username=33F6R73&password=7XFS564&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://madoart.xyz',
+    username: '33F6R73',
+    password: '7XFS564',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 26,
+  },
+  // --- GoldenPass (goldenpass.xyz) ---
+  {
+    id: 'default-goldenpass-1',
+    name: 'GoldenPass (3433420)',
+    type: 'xstream',
+    url: 'http://goldenpass.xyz/get.php?username=3433420&password=EMPS8HU&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://goldenpass.xyz',
+    username: '3433420',
+    password: 'EMPS8HU',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 27,
+  },
+  // --- BlueSky (bluesky1.xyz) ---
+  {
+    id: 'default-bluesky-1',
+    name: 'BlueSky (parfaittek104)',
+    type: 'xstream',
+    url: 'http://bluesky1.xyz:80/get.php?username=parfaittek104&password=AF0D0D7A017D&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://bluesky1.xyz:80',
+    username: 'parfaittek104',
+    password: 'AF0D0D7A017D',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 28,
+  },
+  // --- Lared4 (dzcunuwf.lared4.com) ---
+  {
+    id: 'default-lared-1',
+    name: 'Lared4 1 (344522F)',
+    type: 'xstream',
+    url: 'http://dzcunuwf.lared4.com:80/get.php?username=344522F44FF3579&password=OMxswVFKJP&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://dzcunuwf.lared4.com:80',
+    username: '344522F44FF3579',
+    password: 'OMxswVFKJP',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 29,
+  },
+  {
+    id: 'default-lared-2',
+    name: 'Lared4 2 (1F28021)',
+    type: 'xstream',
+    url: 'http://dzcunuwf.lared4.com:80/get.php?username=1F28021393C5220&password=DRaqYQdCJy&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://dzcunuwf.lared4.com:80',
+    username: '1F28021393C5220',
+    password: 'DRaqYQdCJy',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 30,
+  },
+  // --- BigDonkey (bigdonkeyfanz.com) ---
+  {
+    id: 'default-bigdonkey-1',
+    name: 'BigDonkey 1 (MAG37UV)',
+    type: 'xstream',
+    url: 'http://bigdonkeyfanz.com:8080/get.php?username=MAG37UV6CVZ&password=EJFYBMHE&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://bigdonkeyfanz.com:8080',
+    username: 'MAG37UV6CVZ',
+    password: 'EJFYBMHE',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 31,
+  },
+  {
+    id: 'default-bigdonkey-2',
+    name: 'BigDonkey 2 (JME3AMN)',
+    type: 'xstream',
+    url: 'http://bigdonkeyfanz.com:8080/get.php?username=JME3AMNN&password=5A594EK2&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://bigdonkeyfanz.com:8080',
+    username: 'JME3AMNN',
+    password: '5A594EK2',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 32,
+  },
+  {
+    id: 'default-bigdonkey-3',
+    name: 'BigDonkey 3 (Y24GQ8M)',
+    type: 'xstream',
+    url: 'http://bigdonkeyfanz.com:8080/get.php?username=Y24GQ8M7&password=DWQC2UGZ&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://bigdonkeyfanz.com:8080',
+    username: 'Y24GQ8M7',
+    password: 'DWQC2UGZ',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 33,
+  },
+  // --- GoldenFrance (goldenfrance.xyz) ---
+  {
+    id: 'default-goldenfrance-1',
+    name: 'GoldenFrance (64C314A)',
+    type: 'xstream',
+    url: 'http://goldenfrance.xyz:80/get.php?username=64C314A44537782&password=eYHa1NmIN7&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://goldenfrance.xyz:80',
+    username: '64C314A44537782',
+    password: 'eYHa1NmIN7',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 34,
   },
 ];
 
-const PLAYLISTS_STORAGE_KEY = 'blvcktv_custom_playlists_v5';
-const ACTIVE_PLAYLIST_STORAGE_KEY = 'blvcktv_active_playlist_id_v5';
-const HEALTH_STORAGE_KEY = 'blvcktv_stream_health_v2';
+const PLAYLISTS_STORAGE_KEY = 'blvcktv_custom_playlists_v6';
+const ACTIVE_PLAYLIST_STORAGE_KEY = 'blvcktv_active_playlist_id_v6';
+const HEALTH_STORAGE_KEY = 'blvcktv_stream_health_v3';
 
 export const INITIAL_HEALTH_MAP: Record<string, StreamHealthStatus> = {
   'default-iptv-org': 'online',
   'default-infinity-1': 'online',
   'default-infinity-3': 'online',
-  'default-infinity-4': 'online',
   'default-magnike-2': 'online',
   'default-magnike-3': 'online',
   'default-magnike-4': 'online',
   'default-phantom-5': 'online',
-  'default-phantom-1': 'offline',
-  'default-phantom-2': 'offline',
-  'default-phantom-3': 'offline',
-  'default-phantom-4': 'offline',
-  'default-magnike-1': 'offline',
-  'default-magnike-5': 'offline',
-  'default-infinity-2': 'offline',
-  'default-infinity-5': 'offline',
-  'default-infinity-6': 'offline',
-  'default-infinity-7': 'offline',
-  'default-atlaspro-1': 'offline',
+  'default-phantom-1': 'online',
+  'default-phantom-2': 'online',
+  'default-phantom-3': 'online',
+  'default-phantom-4': 'online',
+  'default-magnike-1': 'online',
+  'default-magnike-5': 'online',
+  'default-infinity-5': 'online',
+  'default-infinity-6': 'online',
+  'default-infinity-7': 'online',
+  'default-atlaspro-1': 'online',
   'default-atlaspro-2': 'online',
-  'default-atlaspro-3': 'offline',
-  'default-atlaspro-4': 'offline',
-  'default-atlaspro-5': 'offline',
-  'default-atlaspro-6': 'offline',
+  'default-atlaspro-3': 'online',
+  'default-atlaspro-5': 'online',
+  'default-madoart-1': 'online',
+  'default-madoart-2': 'online',
+  'default-goldenpass-1': 'online',
+  'default-bluesky-1': 'online',
+  'default-lared-1': 'online',
+  'default-lared-2': 'online',
+  'default-bigdonkey-1': 'online',
+  'default-bigdonkey-2': 'online',
+  'default-bigdonkey-3': 'online',
+  'default-goldenfrance-1': 'online',
 };
 
 export function normalizePlaylistUrl(rawUrl: string): string {
@@ -444,11 +534,12 @@ export function getStoredPlaylists(): CustomPlaylist[] {
       }
     }
 
-    // Migration from v2/v3/v4: keep any user-added playlists
+    // Migration from v2/v3/v4/v5: keep any user-added playlists
+    const oldV5 = localStorage.getItem('blvcktv_custom_playlists_v5');
     const oldV4 = localStorage.getItem('blvcktv_custom_playlists_v4');
     const oldV3 = localStorage.getItem('blvcktv_custom_playlists_v3');
     const oldV2 = localStorage.getItem('blvcktv_custom_playlists_v2');
-    const prev = oldV4 ? JSON.parse(oldV4) : oldV3 ? JSON.parse(oldV3) : oldV2 ? JSON.parse(oldV2) : null;
+    const prev = oldV5 ? JSON.parse(oldV5) : oldV4 ? JSON.parse(oldV4) : oldV3 ? JSON.parse(oldV3) : oldV2 ? JSON.parse(oldV2) : null;
 
     if (Array.isArray(prev)) {
       const userAdded = prev.filter((p: CustomPlaylist) => !p.isDefault && !p.id.startsWith('default-'));
