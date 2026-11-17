@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '@/context/AppContext';
-import { useChannels } from '@/hooks/useChannels';
+import { useChannels, useLiveCatalog } from '@/context/LiveCatalogContext';
 import { resolveM3u8Url } from '@/lib/m3u8Resolver';
 import {
   discoverPathsForChannel,
@@ -28,7 +28,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { X, Monitor, Maximize, RefreshCw, Radio, List, ChevronDown, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Monitor, Maximize, Minimize2, RefreshCw, Radio, List, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Channel } from '@/types';
 import type { SportsEvent } from '@/lib/sportsEvents';
 import { isM3uChannelId } from '@/lib/m3uCatalogs';
@@ -44,8 +44,9 @@ function serverLabel(server: LiveServer): string {
 }
 
 export default function LiveTVPlayer() {
-  const { selectedChannel, setSelectedChannel } = useApp();
+  const { selectedChannel, setSelectedChannel, isPlayerMinimized, setIsPlayerMinimized, setCurrentPage } = useApp();
   const { channels } = useChannels();
+  const { activePlaylist } = useLiveCatalog();
   const isMobile = useIsMobileLayout();
   const [browseOpen, setBrowseOpen] = useState(false);
   const [showServerMenu, setShowServerMenu] = useState(false);
@@ -64,7 +65,13 @@ export default function LiveTVPlayer() {
 
   const handleClose = useCallback(() => {
     setSelectedChannel(null);
-  }, [setSelectedChannel]);
+    setIsPlayerMinimized(false);
+  }, [setSelectedChannel, setIsPlayerMinimized]);
+
+  const handleMinimize = useCallback(() => {
+    setIsPlayerMinimized(true);
+    setCurrentPage('livetv');
+  }, [setIsPlayerMinimized, setCurrentPage]);
 
   const loadChannel = useCallback(async (channelId: string, server: LiveServer, streamUrl?: string, provider?: Channel['provider']) => {
     const gen = ++loadGen.current;
@@ -130,7 +137,11 @@ export default function LiveTVPlayer() {
       return;
     }
 
-    document.body.setAttribute('data-player-open', 'true');
+    if (!isPlayerMinimized) {
+      document.body.setAttribute('data-player-open', 'true');
+    } else {
+      document.body.removeAttribute('data-player-open');
+    }
     autoFallbackRef.current = true;
 
     const streamUrl = selectedChannel.streamUrl ?? activeChannelMeta.current?.streamUrl;
@@ -153,7 +164,7 @@ export default function LiveTVPlayer() {
     return () => {
       document.body.removeAttribute('data-player-open');
     };
-  }, [selectedChannel?.id, selectedChannel?.streamUrl, selectedChannel?.provider, loadChannel]);
+  }, [selectedChannel?.id, selectedChannel?.streamUrl, selectedChannel?.provider, loadChannel, isPlayerMinimized]);
 
   const switchChannel = useCallback((channel: Channel) => {
     setSelectedChannel(resolveLiveChannel(channel, channels));
@@ -178,7 +189,13 @@ export default function LiveTVPlayer() {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
+      if (e.key === 'Escape') {
+        if (!isPlayerMinimized) {
+          handleMinimize();
+        } else {
+          handleClose();
+        }
+      }
     };
     const handleChannelStep = (e: Event) => {
       const step = (e as CustomEvent<number>).detail ?? 1;
@@ -190,7 +207,7 @@ export default function LiveTVPlayer() {
       window.removeEventListener('keydown', handleKey);
       window.removeEventListener('blvcktv:channel-step', handleChannelStep);
     };
-  }, [handleClose, stepChannel]);
+  }, [handleClose, handleMinimize, isPlayerMinimized, stepChannel]);
 
   useEffect(() => {
     if (!showServerMenu) return;
@@ -321,25 +338,106 @@ export default function LiveTVPlayer() {
   const favCategory = activeChannelMeta.current?.category ?? 'Live';
   const favCountry = activeChannelMeta.current?.country ?? '—';
 
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex flex-col lg:flex-row"
-      style={{ background: '#000' }}
-      data-player-open="true"
-      tabIndex={-1}
-    >
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-4 py-2 bg-[#0a0a0f] border-b border-[rgba(139,92,246,0.15)] shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))] lg:pt-2 z-30">
-          {/* Prominent Back Button for Android / TV Remote / Touch */}
+  const renderVideo = (compact: boolean = false) => {
+    if (loading) {
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-black">
+          <div className="w-8 h-8 rounded-full border-2 border-[#8b5cf6] border-t-transparent animate-spin" />
+        </div>
+      );
+    }
+    if (mode === 'hls' && m3u8Url) {
+      return (
+        <HlsPlayer
+          src={m3u8Url}
+          title={selectedChannel.name}
+          onError={handleHlsError}
+          headerMode={isM3uPlayback ? 'none' : 'dlhd'}
+          compact={compact}
+        />
+      );
+    }
+    if (mode === 'hls' && hlsFailed) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black px-4 text-center">
+          <p className="text-xs text-[#9ca3af]">Stream unavailable for this channel.</p>
+          {!compact && (
+            <div className="flex items-center gap-2 mt-1">
+              <button
+                type="button"
+                onClick={retry}
+                className="touch-target px-4 py-2 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => stepChannel(1)}
+                className="touch-target px-4 py-2 rounded-lg bg-[#1e1e2d] border border-[rgba(139,92,246,0.3)] text-[#f1f1f4] text-xs font-bold"
+              >
+                Next Channel
+              </button>
+            </div>
+          )}
+        </div>
+      );
+    }
+    if (iframeUrl) {
+      return (
+        <div className={`w-full h-full ${compact ? 'pointer-events-none' : ''}`}>
+          <StreamIframe
+            src={iframeUrl}
+            title={selectedChannel.name}
+            variant="live"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+          />
+        </div>
+      );
+    }
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-black px-4 text-center">
+        <p className="text-xs text-[#9ca3af]">Could not load stream.</p>
+        {!compact && (
           <button
             type="button"
-            onClick={handleClose}
-            autoFocus
-            className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(239,68,68,0.18)] hover:bg-[rgba(239,68,68,0.3)] border border-[rgba(239,68,68,0.35)] text-[#fca5a5] text-xs font-bold shrink-0"
-            aria-label="Back to channels"
+            onClick={retry}
+            className="touch-target px-4 py-2 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold mt-1"
           >
-            <ArrowLeft size={15} />
-            <span className="hidden xs:inline sm:inline">Back</span>
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className={
+        isPlayerMinimized
+          ? isMobile
+            ? "fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+8px)] left-2 right-2 z-[90] rounded-xl bg-[#14141f]/95 backdrop-blur-md border border-[rgba(139,92,246,0.35)] shadow-[0_8px_30px_rgba(0,0,0,0.85)] flex items-center h-[72px] p-1.5 gap-2.5 transition-all duration-200"
+            : "fixed bottom-6 right-6 z-[90] w-96 rounded-2xl bg-[#14141f]/95 backdrop-blur-md border border-[rgba(139,92,246,0.35)] shadow-[0_12px_40px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden transition-all duration-200"
+          : "fixed inset-0 z-[100] flex flex-col lg:flex-row bg-black"
+      }
+      data-player-open={!isPlayerMinimized}
+      data-player-minimized={isPlayerMinimized}
+      tabIndex={-1}
+    >
+      {/* Full Player Header (when expanded) */}
+      {!isPlayerMinimized && (
+        <div className="flex items-center gap-1.5 sm:gap-2.5 px-2.5 sm:px-4 py-2 bg-[#0a0a0f] border-b border-[rgba(139,92,246,0.15)] shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))] lg:pt-2 z-30">
+          {/* Browse / Minimize Button */}
+          <button
+            type="button"
+            onClick={handleMinimize}
+            autoFocus
+            className="touch-target flex items-center gap-1.5 h-9 px-3 rounded-lg bg-[rgba(139,92,246,0.2)] hover:bg-[rgba(139,92,246,0.35)] border border-[rgba(139,92,246,0.4)] text-[#c4b5fd] text-xs font-bold shrink-0"
+            aria-label="Browse channels and sources while playing"
+            title="Browse channels & sources while playing"
+          >
+            <ChevronDown size={16} />
+            <span>Browse</span>
           </button>
 
           <div className="flex-1 min-w-0">
@@ -349,6 +447,7 @@ export default function LiveTVPlayer() {
                 <span className="live-dot" /> LIVE
               </span>
               <span className="text-[#6b7280] truncate">
+                {activePlaylist?.name ? `· ${activePlaylist.name} ` : ''}
                 {isM3uPlayback
                   ? '· public IPTV'
                   : mode === 'hls'
@@ -475,76 +574,165 @@ export default function LiveTVPlayer() {
 
           <button
             type="button"
+            onClick={handleMinimize}
+            className="touch-target w-9 h-9 rounded-full bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(139,92,246,0.25)] flex items-center justify-center text-[#f1f1f4] shrink-0"
+            aria-label="Minimize player"
+            title="Minimize player to browse channels & sources"
+          >
+            <Minimize2 size={15} />
+          </button>
+
+          <button
+            type="button"
             onClick={handleClose}
             className="touch-target w-9 h-9 rounded-full bg-[rgba(255,255,255,0.08)] flex items-center justify-center text-[#f1f1f4] active:bg-[rgba(239,68,68,0.25)] shrink-0"
             aria-label="Close"
+            title="Stop playback"
           >
             <X size={16} />
           </button>
         </div>
+      )}
 
-        <div className="flex-1 min-h-0">
-          {loading ? (
-            <div className="w-full h-full flex items-center justify-center bg-black">
-              <div className="w-8 h-8 rounded-full border-2 border-[#8b5cf6] border-t-transparent animate-spin" />
-            </div>
-          ) : mode === 'hls' && m3u8Url ? (
-            <HlsPlayer
-              src={m3u8Url}
-              title={selectedChannel.name}
-              onError={handleHlsError}
-              headerMode={isM3uPlayback ? 'none' : 'dlhd'}
-            />
-          ) : mode === 'hls' && hlsFailed ? (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
-              <p className="text-sm text-[#9ca3af]">Stream unavailable for this channel.</p>
-              <p className="text-xs text-[#6b7280]">
-                {isNativeApp()
-                  ? 'Tap Next Channel above or Retry.'
-                  : 'Try another channel or tap Retry.'}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={retry}
-                  className="touch-target px-4 py-2.5 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold"
-                >
-                  Retry
-                </button>
-                <button
-                  type="button"
-                  onClick={() => stepChannel(1)}
-                  className="touch-target px-4 py-2.5 rounded-lg bg-[#1e1e2d] border border-[rgba(139,92,246,0.3)] text-[#f1f1f4] text-xs font-bold"
-                >
-                  Next Channel
-                </button>
-              </div>
-            </div>
-          ) : iframeUrl ? (
-            <StreamIframe
-              src={iframeUrl}
-              title={selectedChannel.name}
-              variant="live"
-              onLoad={handleIframeLoad}
-              onError={handleIframeError}
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
-              <p className="text-sm text-[#9ca3af]">Could not load stream.</p>
-              <p className="text-xs text-[#6b7280]">Try another server or channel from the bar above.</p>
-              <button
-                type="button"
-                onClick={retry}
-                className="touch-target px-4 py-2.5 rounded-lg bg-[#8b5cf6] text-white text-xs font-bold"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-        </div>
+      {/* Main Video Viewport (ALWAYS MOUNTED — stream continues uninterrupted) */}
+      <div
+        className={
+          isPlayerMinimized
+            ? isMobile
+              ? "w-[105px] h-full rounded-lg overflow-hidden shrink-0 bg-black relative shadow-inner cursor-pointer"
+              : "w-full aspect-video bg-black relative group cursor-pointer overflow-hidden"
+            : "flex-1 min-h-0 relative bg-black flex flex-col justify-center"
+        }
+        onClick={isPlayerMinimized ? () => setIsPlayerMinimized(false) : undefined}
+      >
+        {renderVideo(isPlayerMinimized)}
+
+        {isPlayerMinimized && !isMobile && (
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/80 text-white text-xs font-bold border border-white/10">
+              <Maximize size={14} /> Tap to expand
+            </span>
+          </div>
+        )}
       </div>
 
-      {!isMobile && (
+      {/* Minimized Controls / Info (only when minimized) */}
+      {isPlayerMinimized && (
+        isMobile ? (
+          <div className="flex-1 min-w-0 flex items-center justify-between gap-1.5 pr-1">
+            <div
+              className="flex-1 min-w-0 cursor-pointer select-none py-1"
+              onClick={() => setIsPlayerMinimized(false)}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="live-dot shrink-0" />
+                <h4 className="text-xs font-bold text-[#f1f1f4] truncate">
+                  {selectedChannel.name}
+                </h4>
+              </div>
+              <p className="text-[10px] text-[#9ca3af] truncate mt-0.5">
+                {activePlaylist?.name ?? (isM3uPlayback ? 'Live TV' : serverLabel(currentServer))}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {channels.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); stepChannel(-1); }}
+                    className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                    title="Previous channel"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); stepChannel(1); }}
+                    className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                    title="Next channel"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsPlayerMinimized(false)}
+                className="w-8 h-8 rounded-lg bg-[rgba(139,92,246,0.2)] hover:bg-[rgba(139,92,246,0.35)] flex items-center justify-center text-[#c4b5fd]"
+                title="Expand full player"
+              >
+                <Maximize size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-8 h-8 rounded-lg bg-[rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.3)] flex items-center justify-center text-[#fca5a5]"
+                title="Stop playback"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between p-2.5 bg-[#0a0a0f] border-t border-[rgba(139,92,246,0.15)] gap-2">
+            <div
+              className="flex-1 min-w-0 cursor-pointer select-none"
+              onClick={() => setIsPlayerMinimized(false)}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="live-dot shrink-0" />
+                <h4 className="text-xs font-bold text-[#f1f1f4] truncate">
+                  {selectedChannel.name}
+                </h4>
+              </div>
+              <p className="text-[10px] text-[#9ca3af] truncate mt-0.5">
+                {activePlaylist?.name ?? (isM3uPlayback ? 'Live TV' : serverLabel(currentServer))}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {channels.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => stepChannel(-1)}
+                    className="w-7 h-7 rounded-lg bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                    title="Previous channel"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => stepChannel(1)}
+                    className="w-7 h-7 rounded-lg bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(139,92,246,0.2)] flex items-center justify-center text-[#f1f1f4]"
+                    title="Next channel"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setIsPlayerMinimized(false)}
+                className="w-7 h-7 rounded-lg bg-[rgba(139,92,246,0.2)] hover:bg-[rgba(139,92,246,0.35)] flex items-center justify-center text-[#c4b5fd]"
+                title="Expand"
+              >
+                <Maximize size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="w-7 h-7 rounded-lg bg-[rgba(239,68,68,0.15)] hover:bg-[rgba(239,68,68,0.3)] flex items-center justify-center text-[#fca5a5]"
+                title="Stop playback"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Full Sidebar on Desktop (hidden when minimized) */}
+      {!isPlayerMinimized && !isMobile && (
         <div className="hidden lg:flex">
           <LivePlayerSidebar
             channels={channels}
@@ -555,7 +743,8 @@ export default function LiveTVPlayer() {
         </div>
       )}
 
-      {isMobile && browseOpen && (
+      {/* Mobile Drawer (accessible in full mode) */}
+      {!isPlayerMinimized && isMobile && browseOpen && (
         <Sheet open={browseOpen} onOpenChange={setBrowseOpen}>
           <SheetContent
             side="bottom"

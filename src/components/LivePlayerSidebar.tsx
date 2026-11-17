@@ -10,7 +10,8 @@ import {
 } from '@/lib/sportsEvents';
 import { filterChannelsByQuery } from '@/lib/searchUtils';
 import { getCategoryGradient } from '@/lib/channelLogos';
-import { Play, Radio, Search, Star, Trophy, Tv } from 'lucide-react';
+import { useLiveCatalog } from '@/context/LiveCatalogContext';
+import { Layers, Play, Radio, Search, Star, Trophy, Tv } from 'lucide-react';
 import type { Channel } from '@/types';
 
 type SidebarTab = 'channels' | 'sports';
@@ -132,6 +133,7 @@ export default function LivePlayerSidebar({
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [visibleCount, setVisibleCount] = useState(SIDEBAR_PAGE_SIZE);
   const { favoriteChannels } = useApp();
+  const { catalogId, setCatalogId, playlists, healthMap } = useLiveCatalog();
 
   const { now, currentEvents, worldCupUpcoming, majorEvents } = useSportsEvents();
   const upcomingMajor = useMemo(
@@ -197,6 +199,32 @@ export default function LivePlayerSidebar({
               <SportRow key={event.id} event={event} now={now} onSelect={() => { onSelectSport(event); onNavigate?.(); }} />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Source Playlist Switcher */}
+      {playlists.length > 0 && (
+        <div className="px-3 py-2 border-b border-[rgba(139,92,246,0.1)] bg-[#0d0d15]">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#9ca3af] flex items-center gap-1.5">
+              <Layers size={11} className="text-[#8b5cf6]" /> Source Playlist
+            </span>
+            <span className="text-[10px] text-[#8b5cf6] font-semibold truncate max-w-[170px]">
+              {playlists.find(p => p.id === catalogId)?.name ?? 'Default'}
+            </span>
+          </div>
+          <select
+            value={catalogId}
+            onChange={(e) => setCatalogId(e.target.value)}
+            className="w-full h-8 px-2 rounded-md bg-[#14141f] border border-[rgba(139,92,246,0.25)] text-xs text-[#f1f1f4] focus:outline-none focus:border-[#8b5cf6]"
+            aria-label="Select playlist source"
+          >
+            {playlists.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name} {healthMap[p.id] === 'online' ? '🟢' : ''}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 

@@ -21,9 +21,10 @@ function getChannelInitials(name: string): string {
 
 export default function ChannelCard({ channel, compact }: ChannelCardProps) {
   const watchChannel = useWatchChannel();
-  const { isFavoriteChannel } = useApp();
+  const { isFavoriteChannel, selectedChannel } = useApp();
   const [imgFailed, setImgFailed] = useState(false);
   const favorited = isFavoriteChannel(channel.id);
+  const isPlaying = selectedChannel?.id === channel.id;
 
   const rawLogo = channel.logo?.trim() ?? '';
   const showLogo = Boolean(rawLogo) && !imgFailed;
@@ -51,13 +52,23 @@ export default function ChannelCard({ channel, compact }: ChannelCardProps) {
       role="button"
       tabIndex={0}
       aria-label={`Watch ${channel.name}`}
-      className="cursor-pointer group rounded-[12px] bg-[#14141f] border border-[rgba(139,92,246,0.15)] hover:border-[rgba(139,92,246,0.5)] transition-all duration-200 hover:shadow-[0_0_20px_rgba(139,92,246,0.18)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.45)]"
+      className={`cursor-pointer group rounded-[12px] bg-[#14141f] transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(139,92,246,0.45)] ${
+        isPlaying
+          ? 'border-2 border-[#8b5cf6] ring-2 ring-[rgba(139,92,246,0.5)] shadow-[0_0_24px_rgba(139,92,246,0.35)]'
+          : 'border border-[rgba(139,92,246,0.15)] hover:border-[rgba(139,92,246,0.5)] hover:shadow-[0_0_20px_rgba(139,92,246,0.18)]'
+      }`}
       style={compact ? { width: 160 } : undefined}
     >
       <div
         className={`relative flex items-center justify-center rounded-t-[12px] overflow-hidden ${compact ? 'h-24' : 'h-[120px]'}`}
         style={{ background: showLogo ? '#0a0a0f' : gradient }}
       >
+        {isPlaying && (
+          <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-[#8b5cf6] text-white text-[9px] font-black uppercase tracking-wider rounded px-1.5 py-0.5 shadow-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span>Playing</span>
+          </div>
+        )}
         {showLogo ? (
           <img
             src={rawLogo}

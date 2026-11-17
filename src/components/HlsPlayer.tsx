@@ -8,6 +8,7 @@ type HlsPlayerProps = {
   onReady?: () => void;
   /** dlhd adds Referer/Origin headers; none for public IPTV m3u8 URLs */
   headerMode?: 'dlhd' | 'none';
+  compact?: boolean;
 };
 
 type HlsInstance = {
@@ -55,7 +56,7 @@ function loadHlsScript(): Promise<void> {
   return hlsScriptPromise;
 }
 
-export default function HlsPlayer({ src, title, onError, onReady, headerMode = 'dlhd' }: HlsPlayerProps) {
+export default function HlsPlayer({ src, title, onError, onReady, headerMode = 'dlhd', compact = false }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -272,7 +273,7 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
         </div>
       )}
 
-      {showUnmute && playing && !failed && (
+      {!compact && showUnmute && playing && !failed && (
         <button
           type="button"
           onClick={(e) => {
@@ -285,50 +286,52 @@ export default function HlsPlayer({ src, title, onError, onReady, headerMode = '
         </button>
       )}
 
-      {/* Clean controls — visible on tap, mouse move, or D-Pad focus */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-200 ${
-          showControls ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
-        }`}
-      >
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            togglePlay();
-          }}
-          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
-          aria-label={playing ? 'Pause' : 'Play'}
+      {/* Clean controls — visible on tap, mouse move, or D-Pad focus (disabled in compact mode) */}
+      {!compact && (
+        <div
+          className={`absolute bottom-0 left-0 right-0 z-20 flex items-center gap-3 px-4 py-3 bg-gradient-to-t from-black/90 to-transparent transition-opacity duration-200 ${
+            showControls ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+          }`}
         >
-          {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-        </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlay();
+            }}
+            className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+            aria-label={playing ? 'Pause' : 'Play'}
+          >
+            {playing ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+          </button>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleMute();
-          }}
-          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
-          aria-label={muted ? 'Unmute' : 'Mute'}
-        >
-          {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
+            className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+            aria-label={muted ? 'Unmute' : 'Mute'}
+          >
+            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
 
-        <span className="flex-1 text-xs text-white/70 truncate">{title}</span>
+          <span className="flex-1 text-xs text-white/70 truncate">{title}</span>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            goFullscreen();
-          }}
-          className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
-          aria-label="Fullscreen"
-        >
-          <Maximize size={16} />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              goFullscreen();
+            }}
+            className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25"
+            aria-label="Fullscreen"
+          >
+            <Maximize size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -85,7 +85,7 @@ function Toast() {
 }
 
 function AppInner() {
-  const { selectedVideo, selectedChannel, selectedDetail } = useApp();
+  const { selectedVideo, selectedChannel, selectedDetail, isPlayerMinimized } = useApp();
   useStreamGuard();
   useTvRemoteNavigation();
 
@@ -96,7 +96,11 @@ function AppInner() {
       <div className="flex-1 flex flex-col min-w-0">
         <TopBar />
 
-        <main className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-6">
+        <main className={`flex-1 overflow-y-auto px-4 sm:px-6 lg:pb-6 ${
+          isPlayerMinimized && selectedChannel
+            ? 'pb-[calc(9.5rem+env(safe-area-inset-bottom))]'
+            : 'pb-[calc(4.5rem+env(safe-area-inset-bottom))]'
+        }`}>
           <div className="mx-auto w-full" style={{ maxWidth: 1600 }}>
             <PageContent />
           </div>

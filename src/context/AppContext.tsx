@@ -21,6 +21,8 @@ interface AppState {
   setSelectedDetail: (v: AppState['selectedDetail']) => void;
   selectedChannel: SelectedLiveChannel | null;
   setSelectedChannel: (v: AppState['selectedChannel']) => void;
+  isPlayerMinimized: boolean;
+  setIsPlayerMinimized: (v: boolean) => void;
   watchlist: WatchItem[];
   refreshWatchlist: () => void;
   toggleWatchlist: (item: WatchItem) => void;
@@ -53,7 +55,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<AppState['selectedVideo']>(null);
   const [selectedDetail, setSelectedDetail] = useState<AppState['selectedDetail']>(null);
-  const [selectedChannel, setSelectedChannel] = useState<AppState['selectedChannel']>(null);
+  const [selectedChannel, setSelectedChannelState] = useState<AppState['selectedChannel']>(null);
+  const [isPlayerMinimized, setIsPlayerMinimized] = useState(false);
+
+  const setSelectedChannel = useCallback((c: AppState['selectedChannel']) => {
+    if (c) {
+      setSelectedVideo(null);
+    } else {
+      setIsPlayerMinimized(false);
+    }
+    setSelectedChannelState(c);
+  }, []);
   const [watchlist, setWatchlist] = useState<WatchItem[]>(getWatchlist());
   const [favoriteChannels, setFavoriteChannels] = useState<FavoriteChannel[]>(getFavoriteChannels());
   const [history, setHistory] = useState<HistoryItem[]>(getHistory());
@@ -123,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       selectedVideo, setSelectedVideo,
       selectedDetail, setSelectedDetail,
       selectedChannel, setSelectedChannel,
+      isPlayerMinimized, setIsPlayerMinimized,
       watchlist, refreshWatchlist, toggleWatchlist, isWatchlisted,
       favoriteChannels, refreshFavoriteChannels, toggleFavoriteChannel, isFavoriteChannel,
       history, refreshHistory, addHistory,
