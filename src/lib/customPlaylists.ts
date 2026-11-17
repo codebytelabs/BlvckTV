@@ -40,19 +40,32 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     createdAt: 2,
   },
   {
-    id: 'default-infinity-3',
-    name: 'InfinityTV 3 (13CF1A2)',
+    id: 'default-infinity-5',
+    name: 'InfinityTV 5 (1472870)',
     type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=13cf1a2a73115d1&password=haxvy9hofu&type=m3u_plus&output=m3u8',
+    url: 'http://infinitytv-mgm.online:80/get.php?username=1472870781733517&password=7F0A390BF521&type=m3u_plus&output=m3u8',
     serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '13CF1A2A73115D1',
-    password: 'hAxvy9hofu',
+    username: '1472870781733517',
+    password: '7F0A390BF521',
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
     createdAt: 3,
   },
   // --- Magnike (magnike.com) ---
+  {
+    id: 'default-magnike-1',
+    name: 'Magnike 1 (1750040)',
+    type: 'xstream',
+    url: 'http://magnike.com/get.php?username=1750040736&password=2451168445&type=m3u_plus',
+    serverUrl: 'http://magnike.com',
+    username: '1750040736',
+    password: '2451168445',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
+    createdAt: 4,
+  },
   {
     id: 'default-magnike-2',
     name: 'Magnike 2 (2565577)',
@@ -94,19 +107,6 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
   },
   // --- PhantomZoo (phantomzoo.online) ---
   {
-    id: 'default-phantom-5',
-    name: 'PhantomZoo 5 (cprfrptool)',
-    type: 'xstream',
-    url: 'http://phantomzoo.online:80/get.php?username=cprfrptool%40&password=7155973782&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://phantomzoo.online:80',
-    username: 'cprfrptool@',
-    password: '7155973782',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 8,
-  },
-  {
     id: 'default-phantom-1',
     name: 'PhantomZoo 1 (87654321)',
     type: 'xstream',
@@ -117,7 +117,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 9,
+    createdAt: 8,
   },
   {
     id: 'default-phantom-2',
@@ -130,7 +130,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 10,
+    createdAt: 9,
   },
   {
     id: 'default-phantom-3',
@@ -143,7 +143,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 11,
+    createdAt: 10,
   },
   {
     id: 'default-phantom-4',
@@ -156,74 +156,20 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
+    createdAt: 11,
+  },
+  {
+    id: 'default-phantom-5',
+    name: 'PhantomZoo 5 (cprfrptool)',
+    type: 'xstream',
+    url: 'http://phantomzoo.online:80/get.php?username=cprfrptool%40&password=7155973782&type=m3u_plus&output=m3u8',
+    serverUrl: 'http://phantomzoo.online:80',
+    username: 'cprfrptool@',
+    password: '7155973782',
+    outputFormat: 'm3u8',
+    enabled: true,
+    isDefault: true,
     createdAt: 12,
-  },
-  // --- Remaining Magnike ---
-  {
-    id: 'default-magnike-1',
-    name: 'Magnike 1 (1750040)',
-    type: 'xstream',
-    url: 'http://magnike.com/get.php?username=1750040736&password=2451168445&type=m3u_plus',
-    serverUrl: 'http://magnike.com',
-    username: '1750040736',
-    password: '2451168445',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 13,
-  },
-  {
-    id: 'default-magnike-5',
-    name: 'Magnike 5 (3003126)',
-    type: 'xstream',
-    url: 'http://magnike.com/get.php?username=3003126827&password=3432645201&type=m3u_plus',
-    serverUrl: 'http://magnike.com',
-    username: '3003126827',
-    password: '3432645201',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 14,
-  },
-  // --- Remaining InfinityTV ---
-  {
-    id: 'default-infinity-5',
-    name: 'InfinityTV 5 (1472870)',
-    type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=1472870781733517&password=7F0A390BF521&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '1472870781733517',
-    password: '7F0A390BF521',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 16,
-  },
-  {
-    id: 'default-infinity-6',
-    name: 'InfinityTV 6 (17C5485)',
-    type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=17C5485C8CF47D4&password=nAnngtwCrK&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '17C5485C8CF47D4',
-    password: 'nAnngtwCrK',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 17,
-  },
-  {
-    id: 'default-infinity-7',
-    name: 'InfinityTV 7 (1C26231)',
-    type: 'xstream',
-    url: 'http://infinitytv-mgm.online:80/get.php?username=1C262312189565F&password=76IsgbAAfC&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://infinitytv-mgm.online:80',
-    username: '1C262312189565F',
-    password: '76IsgbAAfC',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 18,
   },
   // --- Atlas Pro ---
   {
@@ -237,20 +183,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'ts',
     enabled: true,
     isDefault: true,
-    createdAt: 19,
-  },
-  {
-    id: 'default-atlaspro-2',
-    name: 'Atlas Pro 2 (0c1f92b)',
-    type: 'xstream',
-    url: 'http://line.atlaspro4k.me:80/get.php?username=0c1f92b1c9&password=e85604c9a31e&type=m3u_plus',
-    serverUrl: 'http://line.atlaspro4k.me:80',
-    username: '0c1f92b1c9',
-    password: 'e85604c9a31e',
-    outputFormat: 'ts',
-    enabled: true,
-    isDefault: true,
-    createdAt: 20,
+    createdAt: 13,
   },
   {
     id: 'default-atlaspro-3',
@@ -263,35 +196,9 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'ts',
     enabled: true,
     isDefault: true,
-    createdAt: 21,
-  },
-  {
-    id: 'default-atlaspro-5',
-    name: 'Atlas Pro 5 (3401ef2)',
-    type: 'xstream',
-    url: 'http://line.atlaspro4k.me:80/get.php?username=3401ef2847&password=d224c3b50597&type=m3u_plus',
-    serverUrl: 'http://line.atlaspro4k.me:80',
-    username: '3401ef2847',
-    password: 'd224c3b50597',
-    outputFormat: 'ts',
-    enabled: true,
-    isDefault: true,
-    createdAt: 23,
+    createdAt: 14,
   },
   // --- MadoArt (madoart.xyz) ---
-  {
-    id: 'default-madoart-1',
-    name: 'MadoArt 1 (0C4C923)',
-    type: 'xstream',
-    url: 'http://madoart.xyz/get.php?username=0C4C92354FA7954&password=lhfTdg0csG&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://madoart.xyz',
-    username: '0C4C92354FA7954',
-    password: 'lhfTdg0csG',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 25,
-  },
   {
     id: 'default-madoart-2',
     name: 'MadoArt 2 (33F6R73)',
@@ -303,21 +210,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 26,
-  },
-  // --- GoldenPass (goldenpass.xyz) ---
-  {
-    id: 'default-goldenpass-1',
-    name: 'GoldenPass (3433420)',
-    type: 'xstream',
-    url: 'http://goldenpass.xyz/get.php?username=3433420&password=EMPS8HU&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://goldenpass.xyz',
-    username: '3433420',
-    password: 'EMPS8HU',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 27,
+    createdAt: 15,
   },
   // --- BlueSky (bluesky1.xyz) ---
   {
@@ -331,34 +224,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 28,
-  },
-  // --- Lared4 (dzcunuwf.lared4.com) ---
-  {
-    id: 'default-lared-1',
-    name: 'Lared4 1 (344522F)',
-    type: 'xstream',
-    url: 'http://dzcunuwf.lared4.com:80/get.php?username=344522F44FF3579&password=OMxswVFKJP&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://dzcunuwf.lared4.com:80',
-    username: '344522F44FF3579',
-    password: 'OMxswVFKJP',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 29,
-  },
-  {
-    id: 'default-lared-2',
-    name: 'Lared4 2 (1F28021)',
-    type: 'xstream',
-    url: 'http://dzcunuwf.lared4.com:80/get.php?username=1F28021393C5220&password=DRaqYQdCJy&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://dzcunuwf.lared4.com:80',
-    username: '1F28021393C5220',
-    password: 'DRaqYQdCJy',
-    outputFormat: 'm3u8',
-    enabled: true,
-    isDefault: true,
-    createdAt: 30,
+    createdAt: 16,
   },
   // --- BigDonkey (bigdonkeyfanz.com) ---
   {
@@ -372,7 +238,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 31,
+    createdAt: 17,
   },
   {
     id: 'default-bigdonkey-2',
@@ -385,7 +251,7 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 32,
+    createdAt: 18,
   },
   {
     id: 'default-bigdonkey-3',
@@ -398,59 +264,49 @@ export const DEFAULT_PLAYLISTS: CustomPlaylist[] = [
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 33,
+    createdAt: 19,
   },
-  // --- GoldenFrance (goldenfrance.xyz) ---
+  // --- NovaTV (novatv.xyz) ---
   {
-    id: 'default-goldenfrance-1',
-    name: 'GoldenFrance (64C314A)',
+    id: 'default-novatv-1',
+    name: 'NovaTV (7Z6NN83)',
     type: 'xstream',
-    url: 'http://goldenfrance.xyz:80/get.php?username=64C314A44537782&password=eYHa1NmIN7&type=m3u_plus&output=m3u8',
-    serverUrl: 'http://goldenfrance.xyz:80',
-    username: '64C314A44537782',
-    password: 'eYHa1NmIN7',
+    url: 'http://novatv.xyz/get.php?username=7Z6NN83Z1S236ZJ&password=gVUQGYSPwY&type=m3u',
+    serverUrl: 'http://novatv.xyz',
+    username: '7Z6NN83Z1S236ZJ',
+    password: 'gVUQGYSPwY',
     outputFormat: 'm3u8',
     enabled: true,
     isDefault: true,
-    createdAt: 34,
+    createdAt: 20,
   },
 ];
 
-const PLAYLISTS_STORAGE_KEY = 'blvcktv_custom_playlists_v6';
-const ACTIVE_PLAYLIST_STORAGE_KEY = 'blvcktv_active_playlist_id_v6';
-const HEALTH_STORAGE_KEY = 'blvcktv_stream_health_v3';
+const PLAYLISTS_STORAGE_KEY = 'blvcktv_custom_playlists_v7';
+const ACTIVE_PLAYLIST_STORAGE_KEY = 'blvcktv_active_playlist_id_v7';
+const HEALTH_STORAGE_KEY = 'blvcktv_stream_health_v4';
 
 export const INITIAL_HEALTH_MAP: Record<string, StreamHealthStatus> = {
   'default-iptv-org': 'online',
   'default-infinity-1': 'online',
-  'default-infinity-3': 'online',
+  'default-infinity-5': 'online',
+  'default-magnike-1': 'online',
   'default-magnike-2': 'online',
   'default-magnike-3': 'online',
   'default-magnike-4': 'online',
-  'default-phantom-5': 'online',
   'default-phantom-1': 'online',
   'default-phantom-2': 'online',
   'default-phantom-3': 'online',
   'default-phantom-4': 'online',
-  'default-magnike-1': 'online',
-  'default-magnike-5': 'online',
-  'default-infinity-5': 'online',
-  'default-infinity-6': 'online',
-  'default-infinity-7': 'online',
+  'default-phantom-5': 'online',
   'default-atlaspro-1': 'online',
-  'default-atlaspro-2': 'online',
   'default-atlaspro-3': 'online',
-  'default-atlaspro-5': 'online',
-  'default-madoart-1': 'online',
   'default-madoart-2': 'online',
-  'default-goldenpass-1': 'online',
   'default-bluesky-1': 'online',
-  'default-lared-1': 'online',
-  'default-lared-2': 'online',
   'default-bigdonkey-1': 'online',
   'default-bigdonkey-2': 'online',
   'default-bigdonkey-3': 'online',
-  'default-goldenfrance-1': 'online',
+  'default-novatv-1': 'online',
 };
 
 export function normalizePlaylistUrl(rawUrl: string): string {
@@ -534,12 +390,13 @@ export function getStoredPlaylists(): CustomPlaylist[] {
       }
     }
 
-    // Migration from v2/v3/v4/v5: keep any user-added playlists
+    // Migration from v2/v3/v4/v5/v6: keep any user-added playlists
+    const oldV6 = localStorage.getItem('blvcktv_custom_playlists_v6');
     const oldV5 = localStorage.getItem('blvcktv_custom_playlists_v5');
     const oldV4 = localStorage.getItem('blvcktv_custom_playlists_v4');
     const oldV3 = localStorage.getItem('blvcktv_custom_playlists_v3');
     const oldV2 = localStorage.getItem('blvcktv_custom_playlists_v2');
-    const prev = oldV5 ? JSON.parse(oldV5) : oldV4 ? JSON.parse(oldV4) : oldV3 ? JSON.parse(oldV3) : oldV2 ? JSON.parse(oldV2) : null;
+    const prev = oldV6 ? JSON.parse(oldV6) : oldV5 ? JSON.parse(oldV5) : oldV4 ? JSON.parse(oldV4) : oldV3 ? JSON.parse(oldV3) : oldV2 ? JSON.parse(oldV2) : null;
 
     if (Array.isArray(prev)) {
       const userAdded = prev.filter((p: CustomPlaylist) => !p.isDefault && !p.id.startsWith('default-'));
